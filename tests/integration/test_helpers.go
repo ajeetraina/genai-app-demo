@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"testing"
-	"time"
 )
 
 // ChatRequest represents the structure for sending a chat request
