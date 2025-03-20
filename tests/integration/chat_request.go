@@ -32,7 +32,7 @@ func sendChatRequest(t *testing.T, baseURL string, chatReq ChatRequest) string {
 	// Check response status
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Expected status code 200")
 
-	// Read the response
+	// Read the response as text
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Failed to read response body")
 	
