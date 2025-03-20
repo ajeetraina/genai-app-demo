@@ -1,18 +1,8 @@
 package integration
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"strings"
 	"testing"
-	"time"
 )
-
-// Temporarily simplify this test file to make it compile
-// The full implementation will be added once dependencies are set up properly
 
 // TestLLMResponseQuality tests the quality of responses from the LLM
 func TestLLMResponseQuality(t *testing.T) {
@@ -21,15 +11,17 @@ func TestLLMResponseQuality(t *testing.T) {
 		t.Skip("skipping quality test in short mode")
 	}
 
-	// Setup test environment
-	baseURL, err := setupTestEnvironment()
+	// Setup test environment using the simplified setup function
+	env, err := SetupTestEnvironment(t)
 	if err != nil {
 		t.Fatalf("Failed to setup test environment: %v", err)
 	}
+	defer env.Cleanup()
 
 	// Just a simple test for now
 	t.Run("BasicResponse", func(t *testing.T) {
-		testChatEndpoint(t, baseURL)
+		testHealthEndpoint(t, env.BaseURL)
+		testChatEndpoint(t, env.BaseURL)
 	})
 }
 
@@ -40,15 +32,17 @@ func TestLLMPerformance(t *testing.T) {
 		t.Skip("skipping performance test in short mode")
 	}
 
-	// Setup test environment
-	baseURL, err := setupTestEnvironment()
+	// Setup test environment using the simplified setup function
+	env, err := SetupTestEnvironment(t)
 	if err != nil {
 		t.Fatalf("Failed to setup test environment: %v", err)
 	}
+	defer env.Cleanup()
 
 	// Just a simple test for now
 	t.Run("ResponseLatency", func(t *testing.T) {
-		testChatEndpoint(t, baseURL)
+		testHealthEndpoint(t, env.BaseURL)
+		testChatEndpoint(t, env.BaseURL)
 	})
 }
 
@@ -59,14 +53,16 @@ func TestMultiTurnConversation(t *testing.T) {
 		t.Skip("skipping multi-turn conversation test in short mode")
 	}
 
-	// Setup test environment
-	baseURL, err := setupTestEnvironment()
+	// Setup test environment using the simplified setup function
+	env, err := SetupTestEnvironment(t)
 	if err != nil {
 		t.Fatalf("Failed to setup test environment: %v", err)
 	}
+	defer env.Cleanup()
 
 	// Just a simple test for now
 	t.Run("Conversation", func(t *testing.T) {
-		testChatEndpoint(t, baseURL)
+		testHealthEndpoint(t, env.BaseURL)
+		testChatEndpoint(t, env.BaseURL)
 	})
 }
