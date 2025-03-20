@@ -21,16 +21,6 @@ func TestChatPerformance(t *testing.T) {
 	t.Run("ChatResponseTime", func(t *testing.T) {
 		start := time.Now()
 
-		// Create a chat request
-		chatReq := ChatRequest{
-			Messages: []Message{
-				{
-					Role:    "user",
-					Content: "What is the capital of France?",
-				},
-			},
-		}
-
 		// Perform the chat request
 		testChatEndpoint(t, baseURL)
 
