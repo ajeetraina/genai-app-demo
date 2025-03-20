@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -77,12 +78,27 @@ func testChatEndpoint(t *testing.T, baseURL string) {
 		t.Errorf("Chat endpoint returned non-200 status: %d", resp.StatusCode)
 	}
 
-	// Optionally, you can read and validate the response body here
-	var response map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
+	// Read the response as text instead of trying to parse as JSON
+	// This is because the API returns a text stream, not JSON
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
+		t.Fatalf("Failed to read response body: %v", err)
 	}
 
-	// Add more specific checks as needed
+	// Log a portion of the response for debugging
+	responseText := string(body)
+	if len(responseText) > 0 {
+		displayLen := min(len(responseText), 100) // First 100 chars
+		t.Logf("Response preview: %s...", responseText[:displayLen])
+	} else {
+		t.Error("Empty response from chat endpoint")
+	}
+}
+
+// min returns the smaller of x or y
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }
