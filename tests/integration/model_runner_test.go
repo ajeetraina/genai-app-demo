@@ -50,7 +50,7 @@ func TestModelRunnerIntegration(t *testing.T) {
 	defer env.Cleanup(t)
 
 	// Verify the model is available
-	modelName := "ignaciolopezluna020/llama3.2:1b"
+	modelName := "ignaciolopezluna020/llama3.2:1B"
 	if err := env.EnsureModelAvailable(modelName); err != nil {
 		t.Fatalf("Failed to ensure model is available: %v", err)
 	}
