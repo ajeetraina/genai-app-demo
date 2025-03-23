@@ -77,60 +77,81 @@ func sendCompletionRequest(baseURL string, prompt string) (*CompletionResponse, 
 	return &result, nil
 }
 
-// setupTestContainers creates and starts model-runner container
+// setupTestContainers creates and starts a proper testcontainer for the model runner
 func setupTestContainers(t *testing.T) (string, func()) {
-	// For this integration test, we'll use the local model runner
-	// In a real CI/CD environment, you would create a container instance
-	baseURL := "http://localhost:12434"
+	// Create a proxy container that forwards to your model runner
+	ctx := context.Background()
 	
-	// Test the connection before proceeding
-	client := &http.Client{Timeout: 5 * time.Second}
-	_, err := client.Get(baseURL + "/models")
+	// Start a network for our test containers
+	network, err := testcontainers.GenericNetwork(ctx, testcontainers.GenericNetworkRequest{
+		NetworkRequest: testcontainers.NetworkRequest{
+			Name:           "genai-test-network",
+			CheckDuplicate: true,
+		},
+	})
+	
 	if err != nil {
-		t.Skipf("Skipping test as model runner is not available: %v", err)
+		t.Fatalf("Failed to create test network: %s", err)
 	}
 	
-	// Return cleanup function (not needed for local testing)
-	cleanup := func() {}
-	
-	return baseURL, cleanup
-}
-
-// This is a version that uses actual testcontainers
-// Comment out the function above and uncomment this when you have container setup
-/*
-func setupTestContainers(t *testing.T) (string, func()) {
-	// Create model-runner container
-	modelRunnerContainer, err := testcontainers.GenericContainer(context.Background(), testcontainers.GenericContainerRequest{
+	// Start a Socat container to forward traffic to the host
+	socatContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image: "your-model-runner-image:latest",
-			ExposedPorts: []string{"80/tcp"},
-			Env: map[string]string{
-				"MODEL": "ignaciolopezluna020/llama3.2:1B",
+			Image: "alpine/socat",
+			Cmd:   []string{"tcp-listen:8080,fork,reuseaddr", "tcp:host.docker.internal:12434"},
+			ExposedPorts: []string{
+				"8080/tcp",
 			},
-			WaitingFor: wait.ForHTTP("/engines").WithPort("80/tcp"),
+			Networks: []string{"genai-test-network"},
+			WaitingFor: wait.ForAll(
+				wait.ForListeningPort("8080/tcp"),
+				wait.ForLog("starting").WithStartupTimeout(10*time.Second),
+			),
 		},
 		Started: true,
 	})
+
+	if err != nil {
+		t.Fatalf("Failed to start socat container: %s", err)
+	}
 	
-	require.NoError(t, err)
+	// Get the mapped port
+	mappedPort, err := socatContainer.MappedPort(ctx, "8080")
+	if err != nil {
+		t.Fatalf("Failed to get mapped port: %s", err)
+	}
+
+	host, err := socatContainer.Host(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get host: %s", err)
+	}
 	
-	// Get host and port mapping
-	host, err := modelRunnerContainer.Host(context.Background())
-	require.NoError(t, err)
+	// Create the base URL for the API
+	baseURL := fmt.Sprintf("http://%s:%s", host, mappedPort.Port())
 	
-	port, err := modelRunnerContainer.MappedPort(context.Background(), "80")
-	require.NoError(t, err)
-	
-	baseURL := fmt.Sprintf("http://%s:%s", host, port.Port())
+	// Test the connection before proceeding
+	client := &http.Client{Timeout: 5 * time.Second}
+	_, err = client.Get(baseURL + "/models")
+	if err != nil {
+		// Clean up containers if we can't connect
+		if err := socatContainer.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate socat container: %s", err)
+		}
+		if err := network.Remove(ctx); err != nil {
+			t.Logf("Failed to remove network: %s", err)
+		}
+		t.Skipf("Skipping test as model runner is not available: %v", err)
+	}
 	
 	// Return cleanup function
 	cleanup := func() {
-		if err := modelRunnerContainer.Terminate(context.Background()); err != nil {
-			t.Logf("Failed to terminate container: %s", err)
+		if err := socatContainer.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate socat container: %s", err)
+		}
+		if err := network.Remove(ctx); err != nil {
+			t.Logf("Failed to remove network: %s", err)
 		}
 	}
 	
 	return baseURL, cleanup
 }
-*/
