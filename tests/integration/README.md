@@ -1,6 +1,6 @@
-# GenAI Integration Tests
+# GenAI Integration Tests with Testcontainers
 
-This directory contains integration tests for testing GenAI applications using Testcontainers.
+This directory contains integration tests for GenAI applications using Testcontainers to create isolated, reproducible test environments.
 
 ## Test Overview
 
@@ -24,13 +24,28 @@ These tests demonstrate comprehensive testing of a GenAI application, covering:
    - Testing invalid endpoints
    - Testing context window limits
 
+## How Testcontainers Is Used
+
+These tests use Testcontainers to create isolated test environments:
+
+1. **Creating a Test Network**: Each test creates a dedicated Docker network
+2. **Starting Proxy Containers**: A socat container forwards traffic to your model runner
+3. **Automatic Cleanup**: Containers and networks are automatically removed after tests
+4. **Isolated Test Environments**: Each test runs in its own isolated environment
+
+The use of Testcontainers ensures that tests are:
+- Repeatable across different environments
+- Isolated from each other
+- Representative of real-world deployment scenarios
+- Compatible with CI/CD pipelines
+
 ## Running the Tests
 
 ### Prerequisites
 
 - Go 1.16+
-- Docker (for Testcontainers)
-- A running model runner service (either local or containerized)
+- Docker running locally
+- A model runner service running on the host at port 12434
 
 ### Quick Run
 
@@ -57,16 +72,21 @@ go test -v ./integration -short
 
 ## Test Configuration
 
-The tests are configured to use a local model runner service at `http://localhost:12434`. This can be modified in `helpers.go` if your setup is different.
+The tests use a socat container as a proxy to communicate with your host-based model runner. This allows the tests to run in an isolated Docker environment while still accessing the model runner service.
 
-For CI/CD environments, you can uncomment the containerized setup in `helpers.go` which will create and manage test containers automatically.
+The proxy configuration is defined in `helpers.go` in the `setupTestContainers()` function, which:
+
+1. Creates a Docker network
+2. Starts a socat container that forwards port 8080 to host.docker.internal:12434
+3. Returns the proper base URL to use for tests
+4. Provides a cleanup function to terminate containers and remove networks
 
 ## Adding New Tests
 
 To add new tests:
 
 1. Create a new test file in the `integration` package
-2. Use the `setupTestContainers()` function to get the base URL
+2. Use the `setupTestContainers()` function to get the base URL and cleanup function
 3. Implement test cases using standard Go testing conventions
 4. Add cleanup logic with `defer cleanup()`
 
@@ -74,7 +94,7 @@ To add new tests:
 
 ```go
 func TestNewFeature(t *testing.T) {
-    // Set up the test environment
+    // Set up the test environment using Testcontainers
     baseURL, cleanup := setupTestContainers(t)
     defer cleanup()
     
@@ -91,32 +111,55 @@ func TestNewFeature(t *testing.T) {
 }
 ```
 
-## Benefits of This Testing Approach
+## Advanced Testcontainers Configuration
 
-1. **Isolation**: Tests run in isolated containers, preventing environment-specific issues
-2. **Reproducibility**: Tests produce consistent results across different environments
-3. **Comprehensiveness**: Tests cover many aspects of the GenAI application
-4. **CI/CD Integration**: Tests can be integrated into continuous integration pipelines
-5. **Performance Monitoring**: Tests measure and track performance metrics
+For more advanced testing scenarios, you can modify the `setupTestContainers()` function to:
 
-## Common Issues
+1. Start multiple containers that interact with each other
+2. Mount volumes for persistent storage
+3. Set environment variables to configure container behavior
+4. Define custom wait strategies for container readiness
 
-### Connection Issues
+For example, to test with a fully containerized model runner:
+
+```go
+modelRunnerContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+    ContainerRequest: testcontainers.ContainerRequest{
+        Image: "your-model-runner-image:latest",
+        ExposedPorts: []string{"80/tcp"},
+        Env: map[string]string{
+            "MODEL": "ignaciolopezluna020/llama3.2:1B",
+        },
+        Networks: []string{"genai-test-network"},
+        WaitingFor: wait.ForHTTP("/engines").WithPort("80/tcp"),
+    },
+    Started: true,
+})
+```
+
+## Troubleshooting
+
+### Docker Connectivity Issues
 
 If tests fail with connection errors:
-- Ensure the model runner service is running at the expected URL
-- Check network connectivity between test environment and model runner
-- Verify Docker is running if using Testcontainers
 
-### Model-Specific Issues
+- Ensure Docker is running and accessible
+- Verify that the model runner is running on the host at port 12434
+- Check that host.docker.internal resolves correctly in your Docker environment
+  - On Linux, you may need to add `--add-host=host.docker.internal:host-gateway` to your Docker run commands
+- Examine container logs with `docker logs <container_id>` for more details
 
-If tests fail due to unexpected model behavior:
-- Verify the model is correctly loaded and available
-- Adjust test expectations based on the specific model's capabilities
-- Consider model-specific response formats
+### Test Failures
+
+If individual tests fail:
+
+- Look for detailed error messages in the test output
+- Check the model runner logs for any processing errors
+- Try running with `-v` flag for verbose output
+- Use `-run TestSpecificTest` to isolate and debug a specific test
 
 ## Further Reading
 
-- [Testcontainers Documentation](https://golang.testcontainers.org/)
+- [Testcontainers for Go Documentation](https://golang.testcontainers.org/)
 - [Go Testing Package](https://pkg.go.dev/testing)
-- [Effective GenAI Testing Strategies](https://docs.anthropic.com/en/docs/)
+- [Docker Networking](https://docs.docker.com/network/)
