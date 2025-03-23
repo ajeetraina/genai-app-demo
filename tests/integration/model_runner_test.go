@@ -12,14 +12,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestModelRunnerIntegration tests connectivity to the Model Runner using localhost
+// TestModelRunnerIntegration tests connectivity to the Model Runner using Testcontainers
 func TestModelRunnerIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping Model Runner test in short mode")
 	}
 
-	// Use localhost instead of host.docker.internal when running outside Docker
-	baseURL := "http://localhost:12434"
+	// Set up test environment using Testcontainers
+	baseURL, cleanup := setupTestContainers(t)
+	defer cleanup()
+	
+	// Create HTTP client with reasonable timeout
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	// Test 1: GET /models endpoint
@@ -119,6 +122,6 @@ func TestModelRunnerIntegration(t *testing.T) {
 	
 	// Success message for debugging
 	t.Log("Model Runner test completed successfully!")
-	t.Logf("Model Runner is accessible via: %s", baseURL)
+	t.Logf("Model Runner is accessible via Testcontainers at: %s", baseURL)
 	t.Logf("Use this URL in your application config: %s/engines/llama.cpp/v1", baseURL)
 }
