@@ -48,6 +48,12 @@ The application consists of four main components:
 - Git
 - Go 1.19 or higher
 
+```
+go get github.com/google/uuid
+go get github.com/neo4j/neo4j-go-driver/v5/neo4j
+go mod tidy
+```
+
 ## Quick Start
 
 1. Clone this repository:
