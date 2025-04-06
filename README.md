@@ -181,6 +181,21 @@ The project includes comprehensive observability features:
 
 For more information, see [Observability Documentation](./observability/README.md).
 
+### Grafana Setup
+
+To configure Grafana and create dashboards for monitoring your application:
+
+1. **Configure Data Source**:
+   - Go to Grafana at http://localhost:3001 (login with admin/admin)
+   - Go to Configuration > Data Sources
+   - Add Prometheus data source with URL `http://prometheus:9090` (not localhost)
+
+2. **Create Dashboard**:
+   - Add panels for request rates, token usage, model latency, etc.
+   - Use queries like `sum(rate(genai_app_http_requests_total[5m])) by (endpoint)`
+
+For detailed step-by-step Grafana setup instructions, see [Grafana Setup Guide](./observability/GRAFANA_SETUP.md).
+
 ## Customization
 
 You can customize the application by:
@@ -204,6 +219,7 @@ go test -v
 - **Connection errors**: Verify Docker network settings and that Model Runner is running
 - **Streaming issues**: Check CORS settings in the backend code
 - **Metrics not showing**: Verify that Prometheus can reach the backend metrics endpoint
+- **Grafana connection issues**: Make sure Grafana data source URL is `http://prometheus:9090` (not localhost)
 
 ## License
 
