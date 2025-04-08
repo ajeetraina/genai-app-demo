@@ -1,6 +1,6 @@
 # GenAI App Demo with Docker Model Runner
 
-A modern, full-stack chat application demonstrating how to integrate React frontend with a Go backend and run local Large Language Models (LLMs) using Docker's Model Runner.
+A modern, full-stack chat application demonstrating how to integrate React frontend with a Go backend and run local Large Language Models (LLMs) using Docker's Model Runner. Now with Open WebUI support!
 
 ## Overview
 
@@ -8,6 +8,7 @@ This project showcases a complete Generative AI interface that includes:
 - React/TypeScript frontend with a responsive chat UI
 - Go backend server for API handling
 - Integration with Docker's Model Runner to run Llama 3.2 locally
+- Open WebUI as an alternative interface for interacting with models
 - Comprehensive observability with metrics, logging, and tracing
 
 ## Features
@@ -18,6 +19,7 @@ This project showcases a complete Generative AI interface that includes:
 - 🐳 Dockerized deployment for easy setup and portability
 - 🏠 Run AI models locally without cloud API dependencies
 - 🔒 Cross-origin resource sharing (CORS) enabled
+- 🧠 Open WebUI for powerful model interaction and management
 - 🧪 Integration testing using Testcontainers
 - 📊 Metrics and performance monitoring
 - 📝 Structured logging with zerolog
@@ -37,12 +39,18 @@ The application consists of these main components:
 │  (React/TS) │     │    (Go)     │     │ (Llama 3.2) │
 └─────────────┘     └─────────────┘     └─────────────┘
       :3000              :8080               :12434
-                          │  │
-┌─────────────┐     ┌─────┘  └─────┐     ┌─────────────┐
-│   Grafana   │ <<< │ Prometheus  │     │   Jaeger    │
-│ Dashboards  │     │  Metrics    │     │   Tracing   │
+                          │  │                  ↑
+┌─────────────┐     ┌─────┘  └─────┐     ┌─────┘
+│   Grafana   │ <<< │ Prometheus  │     │ Open WebUI │
+│ Dashboards  │     │  Metrics    │     │  :3200     │
 └─────────────┘     └─────────────┘     └─────────────┘
-      :3001              :9091              :16686
+      :3001              :9091
+
+┌─────────────┐
+│   Jaeger    │
+│   Tracing   │
+└─────────────┘
+      :16686
 ```
 
 ## Connection Methods
@@ -87,7 +95,9 @@ docker model pull ignaciolopezluna020/llama3.2:1B
    docker compose up -d --build
    ```
 
-3. Access the frontend at [http://localhost:3000](http://localhost:3000)
+3. Access the interfaces:
+   - Custom Frontend: [http://localhost:3000](http://localhost:3000)
+   - Open WebUI: [http://localhost:3200](http://localhost:3200)
 
 4. Access observability dashboards:
    - Grafana: [http://localhost:3001](http://localhost:3001) (admin/admin)
@@ -126,6 +136,17 @@ Make sure to set the required environment variables from `backend.env`:
 - `TRACING_ENABLED`: Enable OpenTelemetry tracing
 - `OTLP_ENDPOINT`: OpenTelemetry collector endpoint
 
+### Open WebUI
+
+Open WebUI is included as a separate service in the Docker Compose setup and provides an alternative interface for interacting with models. Key features include:
+
+- Advanced chat interface with conversation history
+- Model selection and parameter configuration
+- Visual interface for prompt engineering
+- Seamless Docker Model Runner integration
+
+No additional setup required as it connects directly to the Model Runner.
+
 ## How It Works
 
 1. The frontend sends chat messages to the backend API
@@ -134,6 +155,7 @@ Make sure to set the required environment variables from `backend.env`:
 4. The backend streams the tokens back to the frontend as they're generated
 5. The frontend displays the incoming tokens in real-time
 6. Observability components collect metrics, logs, and traces throughout the process
+7. Alternatively, Open WebUI can be used to interact directly with the Model Runner
 
 ## Project Structure
 
@@ -191,6 +213,7 @@ You can customize the application by:
 2. Modifying the frontend components for a different UI experience
 3. Extending the backend API with additional functionality
 4. Customizing the Grafana dashboards for different metrics
+5. Adjusting Open WebUI settings in the compose file
 
 ## Testing
 
@@ -207,6 +230,7 @@ go test -v
 - **Connection errors**: Verify Docker network settings and that Model Runner is running
 - **Streaming issues**: Check CORS settings in the backend code
 - **Metrics not showing**: Verify that Prometheus can reach the backend metrics endpoint
+- **Open WebUI not connecting**: Check the WEBUI_OLLAMA_API_BASE_URL in the compose file
 
 ## License
 
