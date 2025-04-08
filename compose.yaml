@@ -26,6 +26,28 @@ services:
     networks:
       - app-network
 
+  # Add Open WebUI service
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:latest
+    restart: unless-stopped
+    ports:
+      - "3200:8080"
+    environment:
+      - WEBUI_DOCKER_MODE=true
+      - WEBUI_AUTH=false
+      - WEBUI_SECRET_KEY=changethissecretkey
+      - WEBUI_OLLAMA_API_BASE_URL=http://model-runner.docker.internal/engines/llama.cpp/v1
+      - WEBUI_OLLAMA_BASE_PATH=/
+      - WEBUI_OLLAMA_API_KEY=${API_KEY:-dockermodelrunner}
+      - WEBUI_ENABLE_MODEL_SELECTION=true
+    volumes:
+      - open-webui-data:/app/backend/data
+    networks:
+      - app-network
+    depends_on:
+      backend:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:v2.45.0
     volumes:
@@ -70,6 +92,7 @@ services:
 
 volumes:
   grafana-data:
+  open-webui-data:
 
 networks:
   app-network:
