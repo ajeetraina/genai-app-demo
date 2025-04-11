@@ -1,0 +1,136 @@
+services:
+  go-genai:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "8080:8080"
+      - "9090:9090"  # Metrics port
+    environment:
+      - PORT=8080
+      - BASE_URL=http://model-runner.docker.internal/engines/v1/chat/completions
+      - MODEL=ai/gemma3:4B-F16
+      - API_KEY=dockermodelrunner
+      - LOG_LEVEL=info
+      - LOG_PRETTY=true
+      - TRACING_ENABLED=true
+      - OTLP_ENDPOINT=jaeger:4318
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      - llm
+    networks:
+      - app-network
+
+  python-genai:
+    build:
+      context: ./py-genai
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - BASE_URL=http://model-runner.docker.internal/engines/v1/chat/completions
+      - MODEL=ai/gemma3:4B-F16
+      - API_KEY=dockermodelrunner
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - llm
+    networks:
+      - app-network
+
+  node-genai:
+    build:
+      context: ./node-genai
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - BASE_URL=http://model-runner.docker.internal/engines/v1/chat/completions
+      - MODEL=ai/gemma3:4B-F16
+      - API_KEY=dockermodelrunner
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - llm
+    networks:
+      - app-network
+
+  llm:
+    provider:
+      type: model
+      options:
+        model: ${LLM_MODEL_NAME:-ai/gemma3:4B-F16}
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - '3000:3000'
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      go-genai:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - '9091:9090'
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.46
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    ports:
+      - '16686:16686'  # UI
+      - '4317:4317'    # OTLP gRPC
+      - '4318:4318'    # OTLP HTTP
+    networks:
+      - app-network
+
+volumes:
+  grafana-data:
+
+networks:
+  app-network:
+    driver: bridge
