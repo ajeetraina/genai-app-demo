@@ -14,6 +14,10 @@ services:
       retries: 3
     networks:
       - app-network
+    extra_hosts:
+      - "model-runner.docker.internal:host-gateway"
+    depends_on:
+      - model-runner
 
   frontend:
     build:
@@ -23,6 +27,16 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - app-network
+
+  model-runner:
+    provider:
+      type: model
+      options:
+        model: ${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
+    ports:
+      - "12434:12434"
     networks:
       - app-network
 
