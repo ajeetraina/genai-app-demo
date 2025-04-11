@@ -1,0 +1,59 @@
+services:
+  go-genai:
+    build:
+      context: ./go-genai
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    env_file:
+      - .env
+    restart: unless-stopped
+    extra_hosts:
+      - "model-runner.docker.internal:host-gateway"
+    depends_on:
+      - model-runner
+
+  python-genai:
+    build:
+      context: ./py-genai
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+    env_file:
+      - .env
+    restart: unless-stopped
+    extra_hosts:
+      - "model-runner.docker.internal:host-gateway"
+    depends_on:
+      - model-runner
+
+  node-genai:
+    build:
+      context: ./node-genai
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+    env_file:
+      - .env
+    restart: unless-stopped
+    extra_hosts:
+      - "model-runner.docker.internal:host-gateway"
+    depends_on:
+      - model-runner
+
+  model-runner:
+    provider:
+      type: model
+      options:
+        model: ${LLM_MODEL_NAME:-ai/gemma3:4B-F16}
+
+networks:
+  default:
+    name: genai-network
+    driver: bridge
