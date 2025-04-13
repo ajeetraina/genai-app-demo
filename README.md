@@ -229,6 +229,27 @@ MIT
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+
+## Key Metrics
+
+
+There are several key metrics that are particularly important to monitor for a Prometheus setup with your Llama 3.2 application:
+
+Memory Profile - This panel shows memory usage (768 MiB, 512 MiB, 256 MiB lines). Memory usage is critical because it affects system stability and performance. The graph shows your p8s process resident memory and virtual memory, which helps you identify potential memory leaks or excessive resource usage.
+Scrape Duration - This shows how long Prometheus takes to collect metrics from your application (currently showing values between 5-20ms). Longer scrape durations might indicate performance issues with your metrics collection or high load on your services.
+Head Chunks - The spiking line (around 500 units) represents how Prometheus is storing data chunks in memory. An increasing trend here indicates growing data storage requirements.
+Query Durations - This multi-line graph shows how long different types of queries take to execute. This is important because slow queries can affect both Grafana dashboard performance and any alerting you might set up.
+Reload Count - The increasing graph line shows successful configuration reloads, which is important for tracking configuration changes and potential issues.
+
+For your Llama 3.2 application specifically, I'd recommend also creating panels for:
+
+Total request count and rate
+Response time statistics (p50, p90, p99 latencies)
+Token usage (both input and output tokens)
+Error rates
+
+These metrics would give you a comprehensive view of your application's performance, resource usage, and user experience.
+
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
