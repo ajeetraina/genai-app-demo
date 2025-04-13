@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	// Import prometheus through the promauto package instead
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	// Import only what's needed for this file
+	_ "github.com/prometheus/client_golang/prometheus" // blank import for side effects
 	"github.com/rs/zerolog/log"
 )
 
