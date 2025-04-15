@@ -14,6 +14,8 @@ services:
       retries: 3
     networks:
       - app-network
+    depends_on:
+      - llm
 
   frontend:
     build:
@@ -67,6 +69,13 @@ services:
       - '4318:4318'    # OTLP HTTP
     networks:
       - app-network
+
+  # New LLM service using Docker Compose's model provider
+  llm:
+    provider:
+      type: model
+      options:
+        model: ${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
 
 volumes:
   grafana-data:
