@@ -224,3 +224,86 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+
+
+# GPU Metrics for Docker Model Runner Chat Interface
+
+This feature branch adds real-time GPU metrics monitoring to the chatbot interface when using Docker Model Runner. It provides visual feedback on GPU utilization, memory usage, token generation speed, and other relevant metrics while interacting with AI models.
+
+## Overview
+
+The GPU metrics panel displays:
+- GPU utilization percentage
+- GPU memory usage
+- Tokens per second processing speed
+- Inference latency
+- Active/idle status indicator
+
+## Implementation Details
+
+### Components
+
+1. **Frontend**
+   - `GPUMetricsPanel.jsx`: React component for displaying metrics
+   - `GPUMetricsPanel.css`: Styling for the metrics panel
+   - Integration with existing chat interface
+
+2. **Backend**
+   - `gpuMetricsService.js`: Service for gathering metrics from the system
+   - `routes/gpuMetrics.js`: Express API endpoint for metrics retrieval
+   - Platform-specific implementations for Apple Silicon and NVIDIA GPUs
+
+## Setup Instructions
+
+1. **Create a new branch**:
+   ```bash
+   git checkout -b feature/gpu-metrics
+   ```
+
+2. **Install required dependencies**:
+   ```bash
+   npm install express child_process
+   ```
+
+3. **Add the new files to your project structure**:
+   - Frontend:
+     - Copy `GPUMetricsPanel.jsx` to your components directory
+     - Copy `GPUMetricsPanel.css` to your styles directory
+   - Backend:
+     - Copy `gpuMetricsService.js` to your API service directory
+     - Copy `routes/gpuMetrics.js` to your routes directory
+
+4. **Integrate with your existing application**:
+   - Import and use the `GPUMetricsPanel` component in your chat interface
+   - Register the `/api/gpu-metrics` endpoint in your Express app
+   - Add the toggle button to show/hide the metrics panel
+
+## Platform Support
+
+- **macOS (Apple Silicon)**: Uses `powermetrics` to retrieve GPU information
+- **Windows (NVIDIA)**: Uses `nvidia-smi` for GPU metrics (available when Docker Desktop adds Windows support)
+- **Linux**: Uses `nvidia-smi` if available
+
+## Permission Requirements
+
+- On macOS, the `powermetrics` command requires admin privileges
+- You may need to run the server with `sudo` or implement a privileged helper service
+
+## Limitations
+
+- GPU metrics are approximate and may vary based on system load
+- Token speed calculations are estimates based on model performance
+- Some metrics might not be available on all platforms
+
+## Notes for Reviewers
+
+This feature is designed as an optional enhancement for developer use and debugging. It can be disabled by default in production environments.
+
+## Future Improvements
+
+- Add support for AMD GPUs
+- Implement more accurate token speed calculations
+- Add historical metrics graphing
+- Add configurable refresh rates
+- Add performance optimization recommendations based on metrics
