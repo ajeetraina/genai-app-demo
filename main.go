@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ajeetraina/genai-app-demo/pkg/middleware"
+	"github.com/ajeetraina/genai-app-demo/pkg/pdf"
 	"github.com/ajeetraina/genai-app-demo/pkg/tracing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -94,7 +95,6 @@ var (
 		},
 	)
 
-	// Add error counter metric
 	errorCounter = promautoFactory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "genai_app_errors_total",
@@ -103,7 +103,6 @@ var (
 		[]string{"type"},
 	)
 
-	// Add first token latency metric
 	firstTokenLatency = promautoFactory.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "genai_app_first_token_latency_seconds",
@@ -114,12 +113,10 @@ var (
 	)
 )
 
-// Helper function to get counter value
+// Helper functions for metrics
 func getCounterValue(counter *prometheus.CounterVec, labelValues ...string) float64 {
-	// Use 0 as the default value
 	value := 0.0
 	
-	// If labels are provided, try to get a specific counter
 	if len(labelValues) > 0 {
 		c, err := counter.GetMetricWithLabelValues(labelValues...)
 		if err == nil {
@@ -131,7 +128,6 @@ func getCounterValue(counter *prometheus.CounterVec, labelValues ...string) floa
 		return value
 	}
 	
-	// Otherwise, sum all counters
 	metrics := make(chan prometheus.Metric, 100)
 	counter.Collect(metrics)
 	close(metrics)
@@ -146,7 +142,6 @@ func getCounterValue(counter *prometheus.CounterVec, labelValues ...string) floa
 	return value
 }
 
-// Helper function to get gauge value
 func getGaugeValue(gauge prometheus.Gauge) float64 {
 	value := 0.0
 	metric := &dto.Metric{}
@@ -156,7 +151,6 @@ func getGaugeValue(gauge prometheus.Gauge) float64 {
 	return value
 }
 
-// Helper function to calculate error rate
 func calculateErrorRate() float64 {
 	totalErrors := getCounterValue(errorCounter)
 	totalRequests := getCounterValue(requestCounter)
@@ -168,15 +162,170 @@ func calculateErrorRate() float64 {
 	return totalErrors / totalRequests
 }
 
-// Helper function to calculate average response time
 func getAverageResponseTime(histogram *prometheus.HistogramVec) float64 {
-	// This is a simplification - in a real app you'd calculate this from histogram buckets
-	// For now, we'll use a fixed value
+	// Simplified for now
 	return 0.5 // 500ms average response time
 }
 
+func setupPDFHandlers(pdfProcessor *pdf.Processor, pdfStorage *pdf.Storage, client *openai.Client, model string) {
+	// PDF upload endpoint
+	http.HandleFunc("/upload-pdf", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Parse multipart form
+		err := r.ParseMultipartForm(10 << 20) // 10 MB
+		if err != nil {
+			http.Error(w, "Failed to parse form", http.StatusBadRequest)
+			return
+		}
+
+		// Get the file
+		file, header, err := r.FormFile("pdf")
+		if err != nil {
+			http.Error(w, "Failed to get file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Validate file
+		if err := pdfProcessor.ValidateFile(header); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Extract text
+		content, pageCount, err := pdfProcessor.ExtractText(header)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Store document
+		doc, err := pdfStorage.Store(header.Filename, content, pageCount)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(doc)
+	})
+
+	// List uploaded PDFs
+	http.HandleFunc("/list-pdfs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		docs := pdfStorage.ListDocuments()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(docs)
+	})
+
+	// Chat with PDF endpoint
+	http.HandleFunc("/chat-with-pdf", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			DocumentID string `json:"documentId"`
+			Question   string `json:"question"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Get document
+		doc, err := pdfStorage.GetDocument(req.DocumentID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		// Prepare context for LLM
+		context := fmt.Sprintf("Based on the following PDF content:\n\n%s\n\nQuestion: %s", doc.Content, req.Question)
+
+		// Set headers for SSE
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Create messages for OpenAI
+		messages := []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant analyzing PDF documents. Answer questions based on the provided PDF content."),
+			openai.UserMessage(context),
+		}
+
+		// Create the request
+		param := openai.ChatCompletionNewParams{
+			Messages: openai.F(messages),
+			Model:    openai.F(model),
+		}
+
+		ctx := r.Context()
+		stream := client.Chat.Completions.NewStreaming(ctx, param)
+
+		// Stream the response
+		for stream.Next() {
+			chunk := stream.Current()
+
+			// Stream each chunk as it arrives
+			if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+				_, err := fmt.Fprintf(w, "%s", chunk.Choices[0].Delta.Content)
+				if err != nil {
+					log.Printf("Error writing to stream: %v", err)
+					return
+				}
+				w.(http.Flusher).Flush()
+			}
+		}
+
+		if err := stream.Err(); err != nil {
+			log.Printf("Error in stream: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	})
+}
+
 func main() {
-	log.Println("Starting GenAI App with observability")
+	log.Println("Starting GenAI App with observability and PDF support")
 
 	// Get configuration from environment
 	baseURL := os.Getenv("BASE_URL")
@@ -207,6 +356,10 @@ func main() {
 		option.WithAPIKey(apiKey),
 	)
 
+	// Initialize PDF components
+	pdfProcessor := pdf.NewProcessor(context.Background())
+	pdfStorage := pdf.NewStorage()
+
 	// Create router
 	mux := http.NewServeMux()
 
@@ -236,7 +389,6 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(http.StatusOK)
 		
-		// Add model information to the health response
 		response := map[string]interface{}{
 			"status": "ok",
 			"model_info": map[string]string{
@@ -250,83 +402,11 @@ func main() {
 	// Add metrics endpoint using custom registry
 	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	
-	// Add metrics summary endpoint for frontend
-	mux.HandleFunc("/metrics/summary", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Content-Type", "application/json")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		// Create a metrics summary by reading from Prometheus metrics
-		summary := map[string]interface{}{
-			"totalRequests": getCounterValue(requestCounter),
-			"averageResponseTime": getAverageResponseTime(requestDuration),
-			"tokensGenerated": getCounterValue(chatTokensCounter, "output", model),
-			"activeUsers": getGaugeValue(activeRequests),
-			"errorRate": calculateErrorRate(),
-		}
-
-		json.NewEncoder(w).Encode(summary)
-	})
-	
-	// Add metrics logging endpoint
-	mux.HandleFunc("/metrics/log", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		// Parse metrics from the request
-		var metricLog MetricLog
-		if err := json.NewDecoder(r.Body).Decode(&metricLog); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
-
-		// Log the metrics using Prometheus (don't increment counters as they are already tracked)
-		// Just log the first token latency which isn't already tracked
-		if metricLog.FirstTokenMs > 0 {
-			firstTokenLatency.WithLabelValues(model).Observe(metricLog.FirstTokenMs / 1000.0)
-		}
-
-		w.WriteHeader(http.StatusOK)
-	})
-	
-	// Add error logging endpoint
-	mux.HandleFunc("/metrics/error", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		// Parse error from the request
-		var errorLog ErrorLog
-		if err := json.NewDecoder(r.Body).Decode(&errorLog); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
-			return
-		}
-
-		// Log the error using Prometheus
-		errorCounter.WithLabelValues(errorLog.ErrorType).Inc()
-
-		w.WriteHeader(http.StatusOK)
-	})
-
-	// Add chat endpoint with advanced tracing
+	// Add chat endpoint
 	mux.HandleFunc("/chat", handleChat(client, model))
+
+	// Setup PDF handlers
+	setupPDFHandlers(pdfProcessor, pdfStorage, client, model)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -336,7 +416,7 @@ func main() {
 		WriteTimeout: 90 * time.Second,
 	}
 
-	// Start metrics server on a separate port with custom registry
+	// Start metrics server on a separate port
 	metricsServer := &http.Server{
 		Addr:    ":9090",
 		Handler: promhttp.HandlerFor(registry, promhttp.HandlerOpts{}),
