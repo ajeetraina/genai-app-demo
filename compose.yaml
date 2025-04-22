@@ -70,7 +70,6 @@ services:
     networks:
       - app-network
 
-  # New LLM service using Docker Compose's model provider
   llm:
     provider:
       type: model
