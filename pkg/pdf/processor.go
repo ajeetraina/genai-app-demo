@@ -2,7 +2,8 @@ package pdf
 
 import (
 	"context"
-	"fmt"
+        "bytes"
+  	"fmt"
 	"io"
 	"mime/multipart"
 	"strings"
@@ -41,8 +42,8 @@ func (p *Processor) ExtractText(file *multipart.FileHeader) (string, int, error)
 	}
 
 	// Open PDF for reading
-	r, err := pdf.NewReader(io.NopCloser(strings.NewReader(string(tempFile))), int64(len(tempFile)))
-	if err != nil {
+	r, err := pdf.NewReader(bytes.NewReader(tempFile), int64(len(tempFile)))
+        if err != nil {
 		return "", 0, fmt.Errorf("failed to parse PDF: %w", err)
 	}
 

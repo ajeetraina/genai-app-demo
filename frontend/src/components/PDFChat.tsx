@@ -1,395 +1,234 @@
-import { useState, useEffect, useRef } from "react";
-import PDFUpload from "./PDFUpload";
-import {
-  FiSend,
-  FiFileText,
-  FiChevronLeft,
-  FiChevronRight,
-  FiSearch,
-  FiHighlight,
-  FiCompare,
-  FiTrash2,
-  FiEdit3
-} from "react-icons/fi";
+import React, { useState, useRef, useEffect } from "react";
 import "./PDFChat.css";
 
-interface PDFDocument {
-  id: string;
-  filename: string;
-  pageCount: number;
-  timestamp: number;
-  annotations?: any[];
-  highlights?: any[];
-}
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 const PDFChat = () => {
-  const [documents, setDocuments] = useState<PDFDocument[]>([]);
-  const [selectedDoc, setSelectedDoc] = useState<PDFDocument | null>(null);
-  const [selectedDocs, setSelectedDocs] = useState<PDFDocument[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [fileSize, setFileSize] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showPdfViewer, setShowPdfViewer] = useState(false);
-  const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 768);
-  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [error, setError] = useState("");
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef(null);
+  const dropAreaRef = useRef(null);
   
-  // Handle responsive layout
   useEffect(() => {
-    const handleResize = () => {
-      setIsSmallScreen(window.innerWidth < 768);
-      if (window.innerWidth < 768) {
-        setShowPdfViewer(false);
+    // Add drag event listeners
+    const handleDrag = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.type === "dragenter" || e.type === "dragover") {
+        setDragActive(true);
+      } else if (e.type === "dragleave") {
+        setDragActive(false);
       }
     };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
+      
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFiles(e.dataTransfer.files[0]);
+      }
+    };
+    
+    const element = dropAreaRef.current;
+    if (element) {
+      element.addEventListener("dragenter", handleDrag);
+      element.addEventListener("dragover", handleDrag);
+      element.addEventListener("dragleave", handleDrag);
+      element.addEventListener("drop", handleDrop);
+      
+      return () => {
+        element.removeEventListener("dragenter", handleDrag);
+        element.removeEventListener("dragover", handleDrag);
+        element.removeEventListener("dragleave", handleDrag);
+        element.removeEventListener("drop", handleDrop);
+      };
+    }
   }, []);
-
-  // Load existing documents
-  useEffect(() => {
-    fetch('/list-pdfs')
-      .then(res => res.json())
-      .then(docs => {
-        setDocuments(docs);
-        if (docs.length > 0 && !selectedDoc) {
-          setSelectedDoc(docs[0]);
-        }
-      })
-      .catch(err => console.error('Failed to load documents:', err));
-  }, []);
-
-  // Scroll to bottom of messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleDocumentUploaded = (doc: PDFDocument) => {
-    setDocuments(prev => [...prev, doc]);
-    setSelectedDoc(doc);
-    setShowPdfViewer(true);
+  
+  const handleBrowseClick = () => {
+    fileInputRef.current.click();
   };
-
-  const handleSendMessage = async () => {
-    if (!selectedDoc || !input.trim()) return;
-
-    const userMessage = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+  
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFiles(e.target.files[0]);
+    }
+  };
+  
+  const handleFiles = (file) => {
+    if (file.type !== "application/pdf") {
+      setError("Please upload a PDF file");
+      return;
+    }
+    
+    // Removed the 200MB limit check
+    
+    setError("");
+    setFile(file);
+    setFileName(file.name);
+    setFileSize(formatFileSize(file.size));
+    
+    // Auto-upload the file
+    uploadFile(file);
+  };
+  
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + " B";
+    else if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    else return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+  
+  const uploadFile = async (file) => {
     setLoading(true);
-
+    const formData = new FormData();
+    formData.append("pdf", file);
+    
     try {
-      const response = await fetch('/chat-with-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentId: selectedDoc.id,
-          question: userMessage,
-        }),
+      // Check if we should use the new endpoint or the old one
+      const response = await fetch("/upload-pdf", {
+        method: "POST",
+        body: formData,
       });
-
-      if (!response.ok) throw new Error('Failed to get response');
-
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText || "Server error"}`);
+      }
+      
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+      console.log("Upload successful:", data);
+      // Store the document ID or other information returned by the server
+      
     } catch (err) {
-      console.error('Chat error:', err);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Sorry, I encountered an error while processing your question.' 
-      }]);
+      console.error("Upload error:", err);
+      setError(err.message || "Failed to upload file");
+      setFile(null);
+      setFileName("");
+      setFileSize("");
     } finally {
       setLoading(false);
-      inputRef.current?.focus();
-    }
-  };
-
-  const changePage = (offset: number) => {
-    setCurrentPage(prevPageNumber => {
-      const maxPages = selectedDoc?.pageCount || 1;
-      return Math.min(Math.max(prevPageNumber + offset, 1), maxPages);
-    });
-  };
-
-  const togglePdfViewer = () => {
-    if (isSmallScreen) {
-      setShowPdfViewer(!showPdfViewer);
     }
   };
   
-  // Toggle comparison mode
-  const toggleCompareMode = () => {
-    setIsCompareMode(!isCompareMode);
-    if (isCompareMode) {
-      setSelectedDocs([]);
-      if (selectedDoc) {
-        setSelectedDocs([selectedDoc]);
-      }
-    } else {
-      if (selectedDoc) {
-        setSelectedDocs([selectedDoc]);
-      }
+  const removeFile = () => {
+    setFile(null);
+    setFileName("");
+    setFileSize("");
+    setError("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
   
-  // Add or remove a document from comparison
-  const toggleDocumentForComparison = (doc: PDFDocument) => {
-    if (!isCompareMode) return;
+  const handleAskQuestion = async () => {
+    if (!file || !question.trim()) return;
     
-    const isSelected = selectedDocs.some(d => d.id === doc.id);
+    setLoading(true);
+    setAnswer("");
     
-    if (isSelected) {
-      if (selectedDocs.length > 1) {
-        setSelectedDocs(selectedDocs.filter(d => d.id !== doc.id));
+    try {
+      const response = await fetch("/chat-with-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: file.name, // This should be the document ID from the server
+          question: question.trim(),
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to get an answer");
       }
-    } else {
-      if (selectedDocs.length < 2) {
-        setSelectedDocs([...selectedDocs, doc]);
-      }
+      
+      const data = await response.json();
+      setAnswer(data.answer);
+    } catch (err) {
+      console.error("Question error:", err);
+      setAnswer("Sorry, I couldn't process your question. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
-
-  const getPdfUrl = (docId: string) => {
-    return `/pdf/${docId}`;
-  };
-
+  
   return (
-    <div className="pdf-chat-container">
-      <div className={`sidebar ${isSmallScreen && showPdfViewer ? 'hidden' : ''}`}>
-        <div className="document-selector-header">
-          <h2>Documents</h2>
-          <div className="document-tools">
-            <PDFUpload onDocumentUploaded={handleDocumentUploaded} />
-            <button 
-              className={`tool-button ${isCompareMode ? 'active' : ''}`} 
-              onClick={toggleCompareMode}
-              title="Compare Documents"
-            >
-              <FiCompare />
-            </button>
-          </div>
+    <div className="pdf-chat-container dark-theme">
+      <h1>
+        <span className="pdf-icon">📄</span>
+        Chat with your pdf file
+      </h1>
+      
+      <div className="upload-section">
+        <p>Upload your PDF</p>
+        
+        <div 
+          ref={dropAreaRef}
+          className={`drop-area ${dragActive ? "active" : ""}`}
+        >
+          <div className="drop-icon">📁</div>
+          <p>Drag and drop file here</p>
+          <p className="file-limit">PDF files only</p>
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+          
+          <button className="browse-button" onClick={handleBrowseClick}>
+            Browse files
+          </button>
         </div>
         
-        <div className="document-list">
-          {documents.length === 0 ? (
-            <div className="no-documents">
-              <FiFileText size={32} />
-              <p>No documents yet. Upload a PDF to get started.</p>
-            </div>
-          ) : (
-            documents.map(doc => (
-              <div
-                key={doc.id}
-                className={`document-item ${selectedDoc?.id === doc.id ? 'selected' : ''} ${
-                  isCompareMode && selectedDocs.some(d => d.id === doc.id) ? 'compare-selected' : ''
-                }`}
-                onClick={() => {
-                  if (isCompareMode) {
-                    toggleDocumentForComparison(doc);
-                  } else {
-                    setSelectedDoc(doc);
-                    setCurrentPage(1);
-                    if (isSmallScreen) {
-                      setShowPdfViewer(false);
-                    } else {
-                      setShowPdfViewer(true);
-                    }
-                  }
-                }}
-              >
-                <div className="document-icon">
-                  <FiFileText />
-                </div>
-                <div className="document-details">
-                  <div className="document-name">{doc.filename}</div>
-                  <div className="document-info">
-                    {doc.pageCount} pages • {new Date(doc.timestamp * 1000).toLocaleDateString()}
-                  </div>
-                </div>
-                {isCompareMode && selectedDocs.some(d => d.id === doc.id) && (
-                  <div className="compare-indicator">✓</div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-        
-        {isCompareMode && selectedDocs.length === 2 && (
-          <div className="comparison-info">
-            <h3>Comparing Documents</h3>
-            <p>Selected: {selectedDocs.map(d => d.filename).join(' & ')}</p>
-            <button className="action-button" onClick={() => setShowPdfViewer(true)}>
-              View Side by Side
-            </button>
+        {fileName && (
+          <div className="file-item">
+            <span className="file-icon">📄</span>
+            <span className="file-name">{fileName}</span>
+            <span className="file-size">{fileSize}</span>
+            <button className="remove-file" onClick={removeFile}>×</button>
           </div>
         )}
+        
+        {error && <div className="error-message">{error}</div>}
       </div>
       
-      {isSmallScreen && selectedDoc && (
-        <div className="view-toggle">
-          <button 
-            className={!showPdfViewer ? 'active' : ''} 
-            onClick={() => setShowPdfViewer(false)}
-          >
-            Chat
-          </button>
-          <button 
-            className={showPdfViewer ? 'active' : ''} 
-            onClick={() => setShowPdfViewer(true)}
-          >
-            PDF
-          </button>
-        </div>
-      )}
-
-      {/* PDF Viewer using browser's native PDF rendering */}
-      {(isCompareMode ? selectedDocs.length > 0 : selectedDoc) && (
-        <div className={`pdf-viewer ${isSmallScreen && !showPdfViewer ? 'hidden' : ''}`}>
-          <div className="pdf-controls">
-            <div className="pdf-pagination">
-              <button onClick={() => changePage(-1)} disabled={currentPage <= 1}>
-                <FiChevronLeft />
-              </button>
-              <span>
-                Page {currentPage} of {selectedDoc?.pageCount || '?'}
-              </span>
-              <button onClick={() => changePage(1)} disabled={currentPage >= (selectedDoc?.pageCount || 1)}>
-                <FiChevronRight />
-              </button>
-            </div>
+      {file && (
+        <div className="question-section">
+          <p>Ask questions about your uploaded PDF file</p>
+          <div className="question-input-container">
+            <input 
+              type="text"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ask a question about your PDF..."
+              className="question-input"
+              onKeyPress={(e) => e.key === 'Enter' && handleAskQuestion()}
+            />
+            <button 
+              className="ask-button" 
+              onClick={handleAskQuestion}
+              disabled={!question.trim() || loading}
+            >
+              Ask
+            </button>
           </div>
           
-          {isCompareMode && selectedDocs.length === 2 ? (
-            <div className="pdf-comparison-container">
-              <div className="pdf-document-container">
-                <iframe 
-                  src={`${getPdfUrl(selectedDocs[0].id)}#page=${currentPage}`}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 'none' }}
-                  title={`PDF Viewer for ${selectedDocs[0].filename}`}
-                />
-              </div>
-              
-              <div className="comparison-separator">
-                <div className="comparison-label">VS</div>
-              </div>
-              
-              <div className="pdf-document-container">
-                <iframe 
-                  src={`${getPdfUrl(selectedDocs[1].id)}#page=${currentPage}`}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 'none' }}
-                  title={`PDF Viewer for ${selectedDocs[1].filename}`}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="pdf-document-container">
-              {selectedDoc && (
-                <iframe 
-                  src={`${getPdfUrl(selectedDoc.id)}#page=${currentPage}`}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 'none' }}
-                  title={`PDF Viewer for ${selectedDoc.filename}`}
-                />
-              )}
+          {loading && <div className="loading">Processing...</div>}
+          
+          {answer && (
+            <div className="answer-container">
+              <p>{answer}</p>
             </div>
           )}
         </div>
       )}
-      
-      <div className={`chat-section ${isSmallScreen && showPdfViewer ? 'hidden' : ''}`}>
-        <div className="chat-header">
-          {selectedDoc && (
-            <div className="selected-document">
-              <span className="doc-title">{selectedDoc.filename}</span>
-            </div>
-          )}
-        </div>
-        
-        {selectedDoc ? (
-          <>
-            <div className="messages-container">
-              {messages.length === 0 ? (
-                <div className="empty-chat">
-                  <div className="empty-chat-icon">💬</div>
-                  <h3>Chat with your PDF</h3>
-                  <p>Ask questions about "{selectedDoc.filename}"</p>
-                </div>
-              ) : (
-                <div className="messages">
-                  {messages.map((msg, idx) => (
-                    <div key={idx} className={`message ${msg.role}`}>
-                      <div className="message-content">
-                        <div className="message-avatar">
-                          {msg.role === 'user' ? '👤' : '🤖'}
-                        </div>
-                        <div className="message-bubble">
-                          <div className="message-text">{msg.content}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {loading && (
-                    <div className="message assistant">
-                      <div className="message-content">
-                        <div className="message-avatar">🤖</div>
-                        <div className="message-bubble loading-bubble">
-                          <div className="typing-indicator">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-            
-            <div className="input-area">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyPress={e => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Ask a question about the document..."
-                disabled={loading}
-              />
-              <button 
-                className={`send-button ${!input.trim() || loading ? 'disabled' : ''}`} 
-                onClick={handleSendMessage} 
-                disabled={!input.trim() || loading}
-              >
-                <FiSend />
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="no-document-selected">
-            <div className="empty-state">
-              <FiFileText size={48} />
-              <h3>No document selected</h3>
-              <p>Please select or upload a PDF document to start chatting</p>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 };
