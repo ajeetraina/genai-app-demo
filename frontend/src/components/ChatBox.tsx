@@ -9,7 +9,7 @@ export default function ChatBox() {
   const [isLoading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [showMetrics, setShowMetrics] = useState(false);
+  const [showMetrics, setShowMetrics] = useState(true); // Default to true to show metrics
   const [messageMetrics, setMessageMetrics] = useState<Record<string, MessageMetrics>>({});
   const [modelInfo, setModelInfo] = useState<ModelMetadata | null>(null);
 
@@ -59,6 +59,9 @@ export default function ChatBox() {
       const messageId = Date.now().toString();
       const requestStartTime = performance.now();
       const tokensIn = estimateTokenCount(currentInput);
+      
+      console.log('Input tokens calculated:', tokensIn); // Debug log
+      
       const metric: MessageMetrics = {
         requestTime: requestStartTime,
         responseTime: 0,
@@ -69,17 +72,17 @@ export default function ChatBox() {
       setMessageMetrics(prev => ({ ...prev, [messageId]: metric }));
 
       // Add user message to the chat with token count
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: messageId,
-          role: 'user',
-          content: currentInput,
-          metrics: {
-            tokensIn: tokensIn
-          }
-        },
-      ]);
+      const userMessage: Message = {
+        id: messageId,
+        role: 'user',
+        content: currentInput,
+        metrics: {
+          tokensIn: tokensIn
+        }
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      console.log('User message with metrics:', userMessage); // Debug log
 
       // Send message to the backend
       const response = await fetch('http://localhost:8080/chat', {
@@ -188,7 +191,8 @@ export default function ChatBox() {
 
   const estimateTokenCount = (text: string): number => {
     // Very rough token estimation (4 chars per token on average)
-    return Math.ceil(text.length / 4);
+    const count = Math.ceil(text.length / 4);
+    return count > 0 ? count : 1; // Ensure at least 1 token for any non-empty text
   };
 
   const logMetrics = async (messageId: string, tokenCount: number, responseTime: number) => {
