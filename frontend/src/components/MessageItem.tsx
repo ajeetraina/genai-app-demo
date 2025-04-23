@@ -10,6 +10,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, showTokenCoun
   const isUser = message.role === 'user';
   const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // Extract token counts for display
+  const userTokens = message.metrics?.tokensIn;
+  const assistantTokens = message.metrics?.tokensOut;
+  
   return (
     <div className={`flex message-item ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
@@ -33,16 +37,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, showTokenCoun
         <div className={`text-xs mt-1 ${isUser ? 'text-right' : 'text-left'} flex items-center ${isUser ? 'justify-end' : 'justify-start'}`}>
           <span className="text-gray-500">{timestamp}</span>
           
-          {showTokenCount && message.metrics && (
+          {showTokenCount && (
             <div className="flex items-center ml-2">
-              {isUser && message.metrics.tokensIn !== undefined && (
-                <span className="text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded">
-                  {message.metrics.tokensIn} tokens
+              {isUser && userTokens !== undefined && (
+                <span className="text-white bg-blue-500 px-2 py-0.5 rounded-full font-medium">
+                  {userTokens} tokens
                 </span>
               )}
-              {!isUser && message.metrics.tokensOut !== undefined && (
-                <span className="text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded">
-                  {message.metrics.tokensOut} tokens
+              {!isUser && assistantTokens !== undefined && (
+                <span className="text-white bg-green-500 px-2 py-0.5 rounded-full font-medium">
+                  {assistantTokens} tokens
                 </span>
               )}
             </div>
