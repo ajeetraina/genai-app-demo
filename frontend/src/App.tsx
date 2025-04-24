@@ -1,24 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useCallback } from 'react';
 import './App.css';
 import ChatBox from './components/ChatBox.tsx';
 import { Header } from './components/Header.tsx';
 import { ModelMetadata } from './types';
 
+// Create context for theme that can be accessed by any component
+export const ThemeContext = createContext({
+  darkMode: false,
+  toggleDarkMode: () => {}
+});
+
 function App() {
   // Initialize darkMode from localStorage or system preference
   const [darkMode, setDarkMode] = useState(() => {
-    const savedDarkMode = localStorage.getItem('darkMode');
-    
-    // If we have a saved preference, use it
-    if (savedDarkMode !== null) {
-      return savedDarkMode === 'true';
+    // This should match the logic in index.html
+    const savedTheme = localStorage.getItem('darkMode');
+    if (savedTheme !== null) {
+      return savedTheme === 'true';
     }
-    
-    // Otherwise, check system preference
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   
   const [modelInfo, setModelInfo] = useState<ModelMetadata | null>(null);
+
+  // Create a stable reference to the toggle function
+  const toggleDarkMode = useCallback(() => {
+    setDarkMode(prevMode => {
+      const newMode = !prevMode;
+      // Update localStorage
+      localStorage.setItem('darkMode', newMode ? 'true' : 'false');
+      return newMode;
+    });
+  }, []);
 
   // Listen for changes to system preference
   useEffect(() => {
@@ -31,35 +44,42 @@ function App() {
       }
     };
     
-    // Some browsers use addEventListener, some use addListener
+    // Add the appropriate event listener
     if (mediaQuery.addEventListener) {
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);
     } else {
-      // @ts-ignore - For older browsers
+      // For older browsers
+      // @ts-ignore - Some browsers use addListener
       mediaQuery.addListener(handleChange);
       return () => {
-        // @ts-ignore - For older browsers
+        // @ts-ignore - Some browsers use removeListener
         mediaQuery.removeListener(handleChange);
       };
     }
-  }, []);
-
-  // Fetch model information on component mount
-  useEffect(() => {
-    fetchModelInfo();
   }, []);
 
   // Apply dark mode class when darkMode state changes
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
+      document.body.classList.add('dark-theme');
       localStorage.setItem('darkMode', 'true');
     } else {
       document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark-theme');
       localStorage.setItem('darkMode', 'false');
     }
+    
+    // Debug output to help diagnose issues
+    console.log('Theme mode updated:', darkMode ? 'dark' : 'light');
+    console.log('HTML class list:', document.documentElement.classList.toString());
   }, [darkMode]);
+
+  // Fetch model information on component mount
+  useEffect(() => {
+    fetchModelInfo();
+  }, []);
 
   const fetchModelInfo = async () => {
     try {
@@ -75,10 +95,6 @@ function App() {
     }
   };
 
-  const toggleDarkMode = () => {
-    setDarkMode(prevMode => !prevMode);
-  };
-
   // Format the model name for display
   const getModelDisplayInfo = () => {
     if (!modelInfo || !modelInfo.model) {
@@ -89,7 +105,7 @@ function App() {
     let modelSize = "";
     
     // Try to extract size information (like 1B, 7B, etc.)
-    const sizeMatch = modelName.match(/[:\-](\\d+[bB])/);
+    const sizeMatch = modelName.match(/[:\-](\d+[bB])/);
     if (sizeMatch && sizeMatch[1]) {
       modelSize = `(${sizeMatch[1].toUpperCase()})`;
     }
@@ -105,8 +121,8 @@ function App() {
     
     // Clean up common model name formats
     modelName = modelName
-      .replace(/\\.(\\d)/g, ' $1')  // Add space before version numbers
-      .replace(/([a-z])(\\d)/gi, '$1 $2')  // Add space between letters and numbers
+      .replace(/\.(\d)/g, ' $1')  // Add space before version numbers
+      .replace(/([a-z])(\d)/gi, '$1 $2')  // Add space between letters and numbers
       .replace(/llama/i, 'Llama')  // Capitalize model names
       .replace(/smollm/i, 'SmolLM');
     
@@ -114,15 +130,17 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 dark:text-white transition-colors duration-200">
-      <Header toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
-      <div className="flex-1 p-4">
-        <ChatBox />
+    <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
+      <div className={`min-h-screen flex flex-col transition-colors duration-300 ease-in-out ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+        <Header toggleDarkMode={toggleDarkMode} darkMode={darkMode} />
+        <div className="flex-1 p-4">
+          <ChatBox />
+        </div>
+        <footer className={`text-center p-4 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p>Powered by <span className="font-semibold">Docker Model Runner</span> running <span className="font-semibold">{getModelDisplayInfo()}</span> in a Docker container</p>
+        </footer>
       </div>
-      <footer className="text-center p-4 text-sm text-gray-500 dark:text-gray-400">
-        <p>Powered by <span className="font-semibold">Docker Model Runner</span> running <span className="font-semibold">{getModelDisplayInfo()}</span> in a Docker container</p>
-      </footer>
-    </div>
+    </ThemeContext.Provider>
   );
 }
 
