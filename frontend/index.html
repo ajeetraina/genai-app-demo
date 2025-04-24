@@ -6,15 +6,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GenAI Chat with Docker + Ollama</title>
     <script>
-      // Check for saved theme preference or prefer-color-scheme
-      const isDarkMode = localStorage.getItem('darkMode') === 'true' || 
-                        (!('darkMode' in localStorage) && 
-                          window.matchMedia('(prefers-color-scheme: dark)').matches);
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
+      // IMPORTANT: This script runs before the UI loads to prevent flash of wrong theme
+      function initializeTheme() {
+        // Get stored preference from localStorage with fallback to system preference
+        const savedTheme = localStorage.getItem('darkMode');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        // Apply dark mode if explicitly saved as 'true' or if system prefers dark and no saved preference
+        const isDark = savedTheme === 'true' || (savedTheme === null && prefersDark);
+        
+        // Apply appropriate class to html element
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+        
+        // Store theme choice if not already stored
+        if (savedTheme === null) {
+          localStorage.setItem('darkMode', isDark ? 'true' : 'false');
+        }
       }
+      
+      // Run theme initialization immediately
+      initializeTheme();
+      
+      // Setup listener for system preference changes
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        // Only apply if user hasn't made an explicit choice
+        if (localStorage.getItem('darkMode') === null) {
+          if (e.matches) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        }
+      });
     </script>
   </head>
   <body>
