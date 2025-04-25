@@ -22,3 +22,10 @@ scrape_configs:
       - targets: ["host.docker.internal:9090"]
         labels:
           instance: "genai-app-backend"
+          
+  - job_name: "llamacpp"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["llamacpp-exporter:9100"]
+        labels:
+          instance: "llamacpp-metrics"
