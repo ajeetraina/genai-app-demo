@@ -1,7 +1,6 @@
 package llamacpp
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -62,10 +61,6 @@ func NewMonitor(config Config) *Monitor {
 func (m *Monitor) Start() error {
 	log.Printf("Starting llama.cpp monitor for model %s at %s", m.config.ModelName, m.config.BaseURL)
 	
-	// Set up graceful shutdown
-	_, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	
 	// Handle signals for graceful shutdown
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -73,7 +68,6 @@ func (m *Monitor) Start() error {
 	go func() {
 		<-c
 		log.Println("Shutting down llama.cpp monitor...")
-		cancel()
 		if err := m.exporter.Stop(); err != nil {
 			log.Printf("Error stopping exporter: %v", err)
 		}
