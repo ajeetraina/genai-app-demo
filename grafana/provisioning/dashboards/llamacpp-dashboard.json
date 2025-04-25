@@ -307,8 +307,8 @@
         },
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "llamacpp_kv_cache_usage_bytes{model=~\"$model\"}",
-          "legendFormat": "KV Cache - {{model}}",
+          "expr": "llamacpp_total_memory_bytes{model=~\"$model\"}",
+          "legendFormat": "Total Memory - {{model}}",
           "refId": "B"
         }
       ],
