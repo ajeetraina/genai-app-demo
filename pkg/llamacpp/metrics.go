@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -147,7 +146,7 @@ func NewMetrics(registry *prometheus.Registry) *Metrics {
 		BatchLatency: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name: "llamacpp_batch_latency_seconds",
 			Help: "Batch processing latency in seconds",
-			Buckets: prometheus.LinearBuckets(0.001, 0.005, 10), // From 1ms to 50ms
+			Buckets: prometheus.LinearBuckets(0.001, 0.005, 10),
 		}, []string{"model"}),
 		
 		KVCacheUsage: prometheus.NewGaugeVec(prometheus.GaugeOpts{
