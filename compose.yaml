@@ -17,6 +17,8 @@ services:
       - app-network
     depends_on:
       - llm
+    extra_hosts:
+      - "model-runner.docker.internal:host-gateway"
 
   frontend:
     build:
