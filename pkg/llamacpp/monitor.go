@@ -63,7 +63,7 @@ func (m *Monitor) Start() error {
 	log.Printf("Starting llama.cpp monitor for model %s at %s", m.config.ModelName, m.config.BaseURL)
 	
 	// Set up graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	
 	// Handle signals for graceful shutdown
