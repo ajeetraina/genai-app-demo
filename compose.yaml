@@ -77,16 +77,13 @@ services:
       options:
         model: ${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
     
-  # llama.cpp metrics exporter
+  # Simple llama.cpp exporter with mock metrics
   llamacpp-exporter:
     build:
       context: .
-      dockerfile: cmd/llamacpp-exporter/Dockerfile
+      dockerfile: llamacpp-exporter-simple.Dockerfile
     environment:
-      - LLAMACPP_BASE_URL=http://model-runner.docker.internal/engines/llama.cpp/v1
       - LLAMACPP_MODEL=${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
-      - LLAMACPP_EXPORTER_ADDR=:9100
-      - LLAMACPP_SCRAPE_INTERVAL=5s
     ports:
       - '9100:9100'
     networks:
