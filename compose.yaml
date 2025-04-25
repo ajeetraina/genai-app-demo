@@ -76,6 +76,24 @@ services:
       type: model
       options:
         model: ${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
+    
+  # llama.cpp metrics exporter
+  llamacpp-exporter:
+    build:
+      context: .
+      dockerfile: cmd/llamacpp-exporter/Dockerfile
+    environment:
+      - LLAMACPP_BASE_URL=http://model-runner.docker.internal/engines/llama.cpp/v1
+      - LLAMACPP_MODEL=${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
+      - LLAMACPP_EXPORTER_ADDR=:9100
+      - LLAMACPP_SCRAPE_INTERVAL=5s
+    ports:
+      - '9100:9100'
+    networks:
+      - app-network
+    depends_on:
+      - llm
+    restart: unless-stopped
 
 volumes:
   grafana-data:
