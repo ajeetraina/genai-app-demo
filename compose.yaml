@@ -77,11 +77,13 @@ services:
       options:
         model: ${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
     
-  # Use a pre-built metrics exporter image instead of building from source
+  # Simple llama.cpp exporter with mock metrics
   llamacpp-exporter:
-    image: prom/node-exporter:latest  # Temporary replacement
-    command:
-      - '--web.listen-address=:9100'
+    build:
+      context: .
+      dockerfile: llamacpp-exporter-simple.Dockerfile
+    environment:
+      - LLAMACPP_MODEL=${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
     ports:
       - '9100:9100'
     networks:
