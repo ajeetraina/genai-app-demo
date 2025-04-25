@@ -11,8 +11,101 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     go mod download -x
 
-# Copy source code
-COPY . .
+# Create a minimal version of the monitor file with the fix
+RUN mkdir -p /src/pkg/llamacpp
+RUN echo 'package llamacpp
+
+import (
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
+)
+
+// Config holds configuration for the llama.cpp monitor
+type Config struct {
+	BaseURL         string
+	ModelName       string
+	ExporterAddr    string
+	ScrapeInterval  time.Duration
+	ClientTimeout   time.Duration
+}
+
+// Monitor handles monitoring of a llama.cpp instance
+type Monitor struct {
+	config  Config
+	client  *http.Client
+	exporter *Exporter
+}
+
+func DefaultConfig() Config {
+	return Config{
+		BaseURL:         getEnvOrDefault("LLAMACPP_BASE_URL", "http://model-runner.docker.internal/engines/llama.cpp/v1"),
+		ModelName:       getEnvOrDefault("LLAMACPP_MODEL", "llama"),
+		ExporterAddr:    getEnvOrDefault("LLAMACPP_EXPORTER_ADDR", ":9100"),
+		ScrapeInterval:  getDurationEnvOrDefault("LLAMACPP_SCRAPE_INTERVAL", 5*time.Second),
+		ClientTimeout:   getDurationEnvOrDefault("LLAMACPP_CLIENT_TIMEOUT", 3*time.Second),
+	}
+}
+
+func NewMonitor(config Config) *Monitor {
+	return &Monitor{
+		config: config,
+		client: &http.Client{
+			Timeout: config.ClientTimeout,
+		},
+		exporter: NewExporter(config.ExporterAddr),
+	}
+}
+
+func (m *Monitor) Start() error {
+	log.Printf("Starting llama.cpp monitor for model %s at %s", m.config.ModelName, m.config.BaseURL)
+	
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	
+	go func() {
+		<-c
+		log.Println("Shutting down llama.cpp monitor...")
+		if err := m.exporter.Stop(); err != nil {
+			log.Printf("Error stopping exporter: %v", err)
+		}
+	}()
+	
+	return m.exporter.Start(m.config.BaseURL, m.config.ModelName, m.config.ScrapeInterval, m.client)
+}
+
+func (m *Monitor) GetMetrics() *Metrics {
+	return m.exporter.Metrics()
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getDurationEnvOrDefault(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil {
+			return duration
+		}
+		
+		if seconds, err := strconv.Atoi(value); err == nil {
+			return time.Duration(seconds) * time.Second
+		}
+	}
+	return defaultValue
+}' > /src/pkg/llamacpp/monitor.go
+
+# Copy the rest of the source code, excluding the problematic monitor.go file
+COPY ./cmd ./cmd
+COPY ./pkg/llamacpp/metrics.go ./pkg/llamacpp/
+COPY ./pkg/llamacpp/exporter.go ./pkg/llamacpp/
 
 # Build the exporter
 ARG TARGETARCH
