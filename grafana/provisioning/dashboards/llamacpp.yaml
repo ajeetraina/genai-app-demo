@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'llamacpp'
+    orgId: 1
+    folder: 'llama.cpp'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
