@@ -15,7 +15,7 @@ The llama.cpp observability solution provides comprehensive monitoring of the ll
 
 The observability solution consists of the following components:
 
-1. **llama.cpp Metrics Exporter**: A standalone Go service that collects metrics from the llama.cpp API and exposes them in Prometheus format
+1. **llama.cpp Metrics Exporter**: A standalone service that collects metrics from the llama.cpp API and exposes them in Prometheus format
 2. **Prometheus**: Collects and stores the metrics
 3. **Grafana Dashboard**: Visualizes the metrics in a comprehensive dashboard
 
@@ -73,11 +73,8 @@ The llama.cpp exporter and observability solution are automatically configured i
 
 The following environment variables can be used to configure the exporter:
 
-- `LLAMACPP_BASE_URL`: URL for the llama.cpp API (default: `http://model-runner.docker.internal/engines/llama.cpp/v1`)
-- `LLAMACPP_MODEL`: Model name for labeling metrics (default: from `LLM_MODEL_NAME` or `ai/llama3.2:1B-Q8_0`)
-- `LLAMACPP_EXPORTER_ADDR`: Address to expose metrics on (default: `:9100`)
-- `LLAMACPP_SCRAPE_INTERVAL`: Interval between metrics scrapes (default: `5s`)
-- `LLAMACPP_CLIENT_TIMEOUT`: HTTP client timeout (default: `3s`)
+- `LLAMACPP_MODEL`: Model name for labeling metrics (default from `LLM_MODEL_NAME` or `ai/llama3.2:1B-Q8_0`)
+- `PORT`: Optional port number for the exporter (default: `9100`)
 
 ### Docker Compose
 
@@ -91,26 +88,38 @@ Prometheus is configured to scrape metrics from the llama.cpp exporter on the `/
 
 A preconfigured Grafana dashboard is provided to visualize llama.cpp metrics. It can be accessed at http://localhost:3001 (default credentials: admin/admin).
 
+## Testing
+
+The observability solution can be tested with:
+
+```bash
+# Build the exporter
+docker build -f llamacpp-exporter-simple.Dockerfile -t llamacpp-exporter-simple .
+
+# Start the services
+docker compose up -d
+
+# Check metrics directly
+curl http://localhost:9100/metrics
+
+# View in Prometheus
+open http://localhost:9091
+
+# View in Grafana
+open http://localhost:3001
+```
+
 ## Troubleshooting
 
 If metrics are not appearing:
 
 1. Check if the exporter is running: `docker compose ps | grep llamacpp-exporter`
 2. Check the exporter logs: `docker compose logs llamacpp-exporter`
-3. Verify connectivity to llama.cpp: `curl http://model-runner.docker.internal/engines/llama.cpp/v1/stats`
-4. Verify the exporter is exposing metrics: `curl http://localhost:9100/metrics`
-5. Check Prometheus targets page: http://localhost:9091/targets
-
-## Extending the Solution
-
-To add more metrics or customize the existing ones:
-
-1. Modify the `pkg/llamacpp/metrics.go` file
-2. Update the exporter to collect the new metrics
-3. Update the Grafana dashboard to visualize the new metrics
+3. Verify the exporter is exposing metrics: `curl http://localhost:9100/metrics`
+4. Check Prometheus targets page: http://localhost:9091/targets
 
 ## Limitations
 
-- The metrics collection depends on the llama.cpp API being accessible
-- Some metrics may not be available depending on the version of llama.cpp
-- GPU metrics are only available when running with GPU support
+- The current implementation uses a simplified exporter that generates mock metrics
+- The metrics format matches the design for real llama.cpp metrics
+- This simplified version allows testing the full observability infrastructure
