@@ -9,9 +9,10 @@ services:
       - '9090:9090'  # Metrics port
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
-      interval: 3s
-      timeout: 3s
+      interval: 5s
+      timeout: 5s
       retries: 3
+      start_period: 10s  # Give more time for initial startup
     networks:
       - app-network
     depends_on:
@@ -23,8 +24,7 @@ services:
     ports:
       - '3000:3000'
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - app-network
 
@@ -88,8 +88,6 @@ services:
       - '9100:9100'
     networks:
       - app-network
-    depends_on:
-      - llm
     restart: unless-stopped
 
 volumes:
