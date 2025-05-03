@@ -1,0 +1,105 @@
+services:
+  backend:
+    env_file: 'backend.env'
+    build:
+      context: .
+      target: backend
+    ports:
+      - '8080:8080'
+      - '9090:9090'  # Metrics port
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+    networks:
+      - app-network
+    depends_on:
+      - llama-cpp
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - '3000:3000'
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - '9091:9090'
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.46
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    ports:
+      - '16686:16686'  # UI
+      - '4317:4317'    # OTLP gRPC
+      - '4318:4318'    # OTLP HTTP
+    networks:
+      - app-network
+
+  # llama.cpp service 
+  llama-cpp:
+    build:
+      context: ./llama.cpp
+      dockerfile: Dockerfile
+    environment:
+      - MODEL_PATH=/app/models/llama-model.gguf
+      - MODEL_URL=${LLAMA_MODEL_URL:-"https://huggingface.co/TheBloke/Llama-3.2-1B-gguf/resolve/main/llama-3.2-1b.Q8_0.gguf"}
+      - CONTEXT_SIZE=4096
+      - THREADS=4
+      - HOST=0.0.0.0
+      - PORT=8080
+      - CHAT_TEMPLATE=llama-3.2
+    ports:
+      - '12434:8080'
+    volumes:
+      - llama-models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app-network
+
+volumes:
+  grafana-data:
+  llama-models:
+
+networks:
+  app-network:
+    driver: bridge
