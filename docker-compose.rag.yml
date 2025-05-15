@@ -1,25 +1,15 @@
 version: '3'
 
 services:
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - VITE_API_URL=http://localhost:8080
-    depends_on:
-      - backend
-
   backend:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - '8080:8080'
+      - '9090:9090'  # Metrics port
     environment:
-      - BASE_URL=http://host.docker.internal:12434/engines/llama.cpp/v1/
+      - BASE_URL=http://llm/engines/llama.cpp/v1/
       - MODEL=llama3.2:1B-Q8_0
       - API_KEY=ollama
       - LOG_LEVEL=info
@@ -27,50 +17,100 @@ services:
       - TRACING_ENABLED=true
       - OTLP_ENDPOINT=jaeger:4317
       - VECTOR_DB_URL=http://vectordb:8000
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+    networks:
+      - app-network
     depends_on:
+      - llm
       - vectordb
-      - jaeger
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
-  # Removing model-runner from compose - it should be run separately with:
-  # docker model run ai/llama3.2:1B-Q8_0 --port 12434 --server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
 
+  # Vector database for RAG functionality
   vectordb:
     image: chromadb/chroma:latest
     ports:
       - "8000:8000"
     volumes:
       - vectordb_data:/chroma/data
+    networks:
+      - app-network
 
   prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9091:9090"
+    image: prom/prometheus:v2.45.0
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - '9091:9090'
+    networks:
+      - app-network
     depends_on:
       - backend
 
   grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+    image: grafana/grafana:10.1.0
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
-      - grafana_data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+    ports:
+      - '3001:3000'
     depends_on:
       - prometheus
+    networks:
+      - app-network
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/all-in-one:1.46
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
     ports:
-      - "16686:16686"  # Web UI
-      - "4317:4317"    # OTLP gRPC
+      - '16686:16686'  # UI
+      - '4317:4317'    # OTLP gRPC
+      - '4318:4318'    # OTLP HTTP
+    networks:
+      - app-network
+
+  # LLM service using Docker Compose's model provider
+  llm:
+    provider:
+      type: model
+      options:
+        model: ${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
+    ports:
+      - '12434:12434'
+    networks:
+      - app-network
 
 volumes:
+  grafana-data:
   vectordb_data:
-  grafana_data:
+
+networks:
+  app-network:
+    driver: bridge
