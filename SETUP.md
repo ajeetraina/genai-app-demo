@@ -5,21 +5,29 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 ## Prerequisites
 
 - Docker and Docker Compose
-- Access to the llama3.2 model
+- Docker's Model Runner with llama3.2 model
 
 ## Setup Steps
 
-1. **Run the Model Runner separately**
+1. **Pull the llama3.2 model**
 
-   First, start the Model Runner container separately:
+   First, ensure you have the model downloaded:
 
    ```bash
-   docker run -p 12434:12434 ai/llama3.2:1B-Q8_0
+   docker model pull ai/llama3.2:1B-Q8_0
+   ```
+
+2. **Start the Model Runner**
+
+   Run the model using Docker's Model Runner functionality:
+
+   ```bash
+   docker model run ai/llama3.2:1B-Q8_0 --port 12434 --server
    ```
 
    This exposes the model on port 12434.
 
-2. **Start the RAG application**
+3. **Start the RAG application**
 
    In a separate terminal, start the RAG application using:
 
@@ -27,7 +35,7 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
    docker compose -f docker-compose.rag.yml up -d --build
    ```
 
-3. **Access the application**
+4. **Access the application**
 
    Once all containers are running, access the application at:
    
@@ -37,7 +45,7 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 
 ## Troubleshooting
 
-- **Connection issues to Model Runner**: Make sure the Model Runner container is running and accessible on port 12434
+- **Connection issues to Model Runner**: Make sure the model is running with `docker model ls` and that it's accessible on port 12434
 - **Backend connectivity issues**: Check logs with `docker compose -f docker-compose.rag.yml logs backend`
 - **Vector database errors**: Verify ChromaDB is running with `docker compose -f docker-compose.rag.yml logs vectordb`
 
