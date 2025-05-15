@@ -9,13 +9,12 @@ services:
       - '8080:8080'
       - '9090:9090'  # Metrics port
     environment:
-      # Use host.docker.internal instead of service name
-      - BASE_URL=http://host.docker.internal:12434/engines/llama.cpp/v1/
+      # Fix the endpoint path to match what Docker Model Runner actually provides
+      - BASE_URL=http://host.docker.internal:12434/v1/
       - MODEL=llama3.2:1B-Q8_0
       - API_KEY=ollama
       - LOG_LEVEL=info
       - LOG_PRETTY=true
-      # Disable tracing completely since we removed Jaeger
       - TRACING_ENABLED=false
       - VECTOR_DB_URL=http://vectordb:8000
     healthcheck:
