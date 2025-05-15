@@ -28,25 +28,14 @@ services:
       - OTLP_ENDPOINT=jaeger:4317
       - VECTOR_DB_URL=http://vectordb:8000
     depends_on:
-      - model-runner
       - vectordb
       - jaeger
     command: ["/app/backend"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  model-runner:
-    image: ai/llama3.2:1B-Q8_0
-    ports:
-      - "12434:12434"
-    environment:
-      - LOG_LEVEL=info
-      - PORT=12434
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-    command: ["--server", "--port", "12434"]
+  # Removed model-runner service as it will be run separately on the host
+  # You should run: docker run -p 12434:12434 ai/llama3.2:1B-Q8_0
 
   vectordb:
     image: chromadb/chroma:latest
