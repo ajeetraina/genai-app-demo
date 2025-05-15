@@ -31,6 +31,7 @@ services:
       - model-runner
       - vectordb
       - jaeger
+    command: ["/app/backend"]
 
   model-runner:
     image: ai/llama3.2:1B-Q8_0
@@ -43,6 +44,7 @@ services:
       resources:
         limits:
           memory: 8G
+    command: ["--server", "--port", "12434"]
 
   vectordb:
     image: chromadb/chroma:latest
