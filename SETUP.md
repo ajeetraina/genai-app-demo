@@ -27,6 +27,8 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 
    This exposes the model on port 12434. Keep this terminal window open.
 
+   Important: Docker Model Runner provides a different API structure than the original API. This has been accounted for in the configuration.
+
 3. **Start the RAG application**
 
    In a separate terminal, start the RAG application using:
@@ -46,9 +48,14 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 
 ### Common Issues
 
-- **Backend can't connect to model**: Make sure you've run the model separately with `docker model run` and it's accessible on port 12434
-- **Network connectivity**: For Linux users, ensure `host.docker.internal` resolves correctly with the `extra_hosts` setting
-- **Vector database errors**: Check ChromaDB logs with `docker compose -f docker-compose.rag.yml logs vectordb`
+- **Backend can't connect to model**: Make sure you've run the model separately with `docker model run` and it's accessible on port 12434. Try visiting http://localhost:12434/v1/health in your browser to check if the model is available.
+
+- **404 Not Found errors**: If you're seeing 404 errors in the backend logs, the endpoint path might not match what the model provides. You can check the available endpoints with:
+  ```bash
+  curl http://localhost:12434/v1/
+  ```
+
+- **Network connectivity**: For Linux users, ensure `host.docker.internal` resolves correctly with the `extra_hosts` setting.
 
 ### Checking Status
 
