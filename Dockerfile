@@ -1,13 +1,5 @@
 # syntax=docker/dockerfile:1
 
-# Comments are provided throughout this file to help you get started.
-# If you need more help, visit the Dockerfile reference guide at
-# https://docs.docker.com/go/dockerfile-reference/
-
-# Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
-
-################################################################################
-# Create a stage for building the backend application.
 ARG GO_VERSION=1.23.4
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS backend-build
 WORKDIR /src
@@ -20,11 +12,17 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
 
 ARG TARGETARCH
 
+# Copy source code and RAG package
+COPY . .
+
+# Create upload directory for documents
+RUN mkdir -p /data/uploads
+
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,target=. \
     CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o /bin/server .
 
-################################################################################
+###############################################################################
 # Create a new stage for running the backend
 FROM alpine:latest AS backend
 
@@ -47,6 +45,12 @@ RUN adduser \
 USER appuser
 
 COPY --from=backend-build /bin/server /bin/
+# Copy the uploads directory
+COPY --from=backend-build /data/uploads /data/uploads
+
+# Environment variables for RAG
+ENV UPLOADS_DIR=/data/uploads
+ENV VECTOR_DB_URL=http://vectordb:8000
 
 EXPOSE 8080
 

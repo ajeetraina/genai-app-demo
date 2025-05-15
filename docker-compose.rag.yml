@@ -1,0 +1,97 @@
+version: '3'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '8080:8080'
+      - '9090:9090'  # Metrics port
+    environment:
+      # Docker Model Runner uses /completions instead of /chat/completions
+      - BASE_URL=http://host.docker.internal:12434/v1/
+      # Tell the backend to use completions endpoint instead of chat/completions
+      - ENDPOINT_TYPE=completions
+      - MODEL=llama3.2:1B-Q8_0
+      - API_KEY=ollama
+      - LOG_LEVEL=debug  # Set to debug for more verbose logs
+      - LOG_PRETTY=true
+      - TRACING_ENABLED=false
+      - VECTOR_DB_URL=http://vectordb:8000
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+    networks:
+      - app-network
+    depends_on:
+      - vectordb
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # Vector database for RAG functionality
+  vectordb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - vectordb_data:/chroma/data
+    networks:
+      - app-network
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - '9091:9090'
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+
+volumes:
+  grafana-data:
+  vectordb_data:
+
+networks:
+  app-network:
+    driver: bridge
