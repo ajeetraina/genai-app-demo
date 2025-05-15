@@ -9,12 +9,14 @@ services:
       - '8080:8080'
       - '9090:9090'  # Metrics port
     environment:
-      - BASE_URL=http://llm/engines/llama.cpp/v1/
+      # Use host.docker.internal instead of service name
+      - BASE_URL=http://host.docker.internal:12434/engines/llama.cpp/v1/
       - MODEL=llama3.2:1B-Q8_0
       - API_KEY=ollama
       - LOG_LEVEL=info
       - LOG_PRETTY=true
-      - TRACING_ENABLED=true
+      # Disable tracing temporarily to avoid jaeger errors
+      - TRACING_ENABLED=false
       - OTLP_ENDPOINT=jaeger:4317
       - VECTOR_DB_URL=http://vectordb:8000
     healthcheck:
@@ -25,8 +27,9 @@ services:
     networks:
       - app-network
     depends_on:
-      - llm
       - vectordb
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build:
@@ -96,16 +99,7 @@ services:
     networks:
       - app-network
 
-  # LLM service using Docker Compose's model provider
-  llm:
-    provider:
-      type: model
-      options:
-        model: ${LLM_MODEL_NAME:-ai/llama3.2:1B-Q8_0}
-    ports:
-      - '12434:12434'
-    networks:
-      - app-network
+  # We'll remove the model provider and add a note to run it separately
 
 volumes:
   grafana-data:
