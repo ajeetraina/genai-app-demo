@@ -41,7 +41,6 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
    
    - Frontend: [http://localhost:3000](http://localhost:3000)
    - Grafana: [http://localhost:3001](http://localhost:3001) (admin/admin)
-   - Jaeger: [http://localhost:16686](http://localhost:16686)
 
 ## Troubleshooting
 
@@ -49,7 +48,7 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 
 - **Backend can't connect to model**: Make sure you've run the model separately with `docker model run` and it's accessible on port 12434
 - **Network connectivity**: For Linux users, ensure `host.docker.internal` resolves correctly with the `extra_hosts` setting
-- **Tracing errors**: If you encounter issues with Jaeger, you can disable tracing by setting `TRACING_ENABLED=false` in the environment variables
+- **Vector database errors**: Check ChromaDB logs with `docker compose -f docker-compose.rag.yml logs vectordb`
 
 ### Checking Status
 
