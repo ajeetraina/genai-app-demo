@@ -15,9 +15,8 @@ services:
       - API_KEY=ollama
       - LOG_LEVEL=info
       - LOG_PRETTY=true
-      # Disable tracing temporarily to avoid jaeger errors
+      # Disable tracing completely since we removed Jaeger
       - TRACING_ENABLED=false
-      - OTLP_ENDPOINT=jaeger:4317
       - VECTOR_DB_URL=http://vectordb:8000
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
@@ -87,19 +86,6 @@ services:
       - prometheus
     networks:
       - app-network
-
-  jaeger:
-    image: jaegertracing/all-in-one:1.46
-    environment:
-      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
-    ports:
-      - '16686:16686'  # UI
-      - '4317:4317'    # OTLP gRPC
-      - '4318:4318'    # OTLP HTTP
-    networks:
-      - app-network
-
-  # We'll remove the model provider and add a note to run it separately
 
 volumes:
   grafana-data:
