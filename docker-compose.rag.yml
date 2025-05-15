@@ -1,0 +1,84 @@
+version: '3'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - BASE_URL=http://model-runner.docker.internal/engines/llama.cpp/v1/
+      - MODEL=llama3.2:1B-Q8_0
+      - API_KEY=ollama
+      - LOG_LEVEL=info
+      - LOG_PRETTY=true
+      - TRACING_ENABLED=true
+      - OTLP_ENDPOINT=jaeger:4317
+      - VECTOR_DB_URL=http://vectordb:8000
+    depends_on:
+      - model-runner
+      - vectordb
+      - jaeger
+
+  model-runner:
+    image: ai/llama3.2:1B-Q8_0
+    ports:
+      - "12434:12434"
+    environment:
+      - LOG_LEVEL=info
+      - PORT=12434
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+
+  vectordb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - vectordb_data:/chroma/data
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"  # Web UI
+      - "4317:4317"    # OTLP gRPC
+
+volumes:
+  vectordb_data:
+  grafana_data:
