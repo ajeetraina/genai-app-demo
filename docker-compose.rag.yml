@@ -9,11 +9,13 @@ services:
       - '8080:8080'
       - '9090:9090'  # Metrics port
     environment:
-      # Fix the endpoint path to match what Docker Model Runner actually provides
+      # Docker Model Runner uses /completions instead of /chat/completions
       - BASE_URL=http://host.docker.internal:12434/v1/
+      # Tell the backend to use completions endpoint instead of chat/completions
+      - ENDPOINT_TYPE=completions
       - MODEL=llama3.2:1B-Q8_0
       - API_KEY=ollama
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug  # Set to debug for more verbose logs
       - LOG_PRETTY=true
       - TRACING_ENABLED=false
       - VECTOR_DB_URL=http://vectordb:8000
