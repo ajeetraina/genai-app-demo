@@ -7,6 +7,15 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 - Docker and Docker Compose
 - Docker Model Runner capability
 
+## API Compatibility Notes
+
+The original backend is designed to work with the OpenAI API format, but Docker Model Runner has a slightly different API structure:
+
+- OpenAI API uses: `/v1/chat/completions`
+- Docker Model Runner uses: `/v1/completions` 
+
+We've added an `ENDPOINT_TYPE=completions` environment variable to help the backend adapt to this difference.
+
 ## Setup Steps
 
 1. **Pull the llama3.2 model**
@@ -27,9 +36,18 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 
    This exposes the model on port 12434. Keep this terminal window open.
 
-   Important: Docker Model Runner provides a different API structure than the original API. This has been accounted for in the configuration.
+3. **Check the API endpoints**
 
-3. **Start the RAG application**
+   To verify the model is running and understand its API structure, run:
+
+   ```bash
+   curl http://localhost:12434/v1/health
+   curl http://localhost:12434/v1/
+   ```
+
+   The first command should return a health status, and the second will list available endpoints.
+
+4. **Start the RAG application**
 
    In a separate terminal, start the RAG application using:
 
@@ -37,7 +55,7 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
    docker compose -f docker-compose.rag.yml up -d --build
    ```
 
-4. **Access the application**
+5. **Access the application**
 
    Once all containers are running, access the application at:
    
@@ -48,20 +66,22 @@ This document provides step-by-step instructions for setting up the RAG-enhanced
 
 ### Common Issues
 
-- **Backend can't connect to model**: Make sure you've run the model separately with `docker model run` and it's accessible on port 12434. Try visiting http://localhost:12434/v1/health in your browser to check if the model is available.
-
-- **404 Not Found errors**: If you're seeing 404 errors in the backend logs, the endpoint path might not match what the model provides. You can check the available endpoints with:
-  ```bash
-  curl http://localhost:12434/v1/
-  ```
+- **404 Errors**: If you see 404 errors, it usually means the API endpoint structure doesn't match:
+   ```
+   # Try these commands to test the API directly:
+   curl http://localhost:12434/v1/completions -X POST -H "Content-Type: application/json" -d '{"prompt": "Hello", "max_tokens": 50}'
+   curl http://localhost:12434/v1/chat/completions -X POST -H "Content-Type: application/json" -d '{"messages": [{"role": "user", "content": "Hello"}], "max_tokens": 50}'
+   ```
 
 - **Network connectivity**: For Linux users, ensure `host.docker.internal` resolves correctly with the `extra_hosts` setting.
+
+- **Docker Model Runner API differences**: If problems persist, the model may expose a different API than expected. Check Docker's documentation for the specific model you're using.
 
 ### Checking Status
 
 - **Model status**: Verify the model is running with `docker model ls --running`
 - **Container status**: Check all services with `docker compose -f docker-compose.rag.yml ps`
-- **Service logs**: View logs with `docker compose -f docker-compose.rag.yml logs backend`
+- **Service logs**: View detailed logs with `docker compose -f docker-compose.rag.yml logs backend`
 
 ## Architecture
 
