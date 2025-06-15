@@ -51,14 +51,30 @@ function App() {
 
   // Apply dark mode class when darkMode state changes
   useEffect(() => {
+    const htmlElement = document.documentElement;
+    
     if (darkMode) {
-      document.documentElement.classList.add('dark');
+      htmlElement.classList.add('dark');
       localStorage.setItem('darkMode', 'true');
+      console.log('🌙 Dark mode activated');
     } else {
-      document.documentElement.classList.remove('dark');
+      htmlElement.classList.remove('dark');
       localStorage.setItem('darkMode', 'false');
+      console.log('☀️ Light mode activated');
     }
+    
+    // Force a reflow to ensure the changes are applied immediately
+    htmlElement.offsetHeight;
   }, [darkMode]);
+
+  // Ensure dark class is applied immediately on initial load
+  useEffect(() => {
+    const htmlElement = document.documentElement;
+    if (darkMode && !htmlElement.classList.contains('dark')) {
+      htmlElement.classList.add('dark');
+      console.log('🚀 Initial dark mode applied');
+    }
+  }, []);
 
   const fetchModelInfo = async () => {
     try {
@@ -75,6 +91,7 @@ function App() {
   };
 
   const toggleDarkMode = () => {
+    console.log(`🔄 Theme toggle clicked - switching from ${darkMode ? 'dark' : 'light'} to ${darkMode ? 'light' : 'dark'}`);
     setDarkMode(prevMode => !prevMode);
   };
 
