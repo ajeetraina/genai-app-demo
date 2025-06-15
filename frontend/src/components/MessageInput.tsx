@@ -1,96 +1,201 @@
-import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent } from 'react';
 
 interface MessageInputProps {
-  input: string;
-  setInput: (input: string) => void;
-  sendMessage: () => void;
-  isLoading: boolean;
-  error: string | null;
+  onSendMessage: (message: string) => void;
+  isDarkMode: boolean;
 }
 
-export function MessageInput({ input, setInput, sendMessage, isLoading, error }: MessageInputProps) {
-  const [height, setHeight] = useState(56); // Default height
+const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, isDarkMode }) => {
+  const [message, setMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  // Handle textarea height adjustment
-  useEffect(() => {
-    if (textareaRef.current) {
-      // Reset height to auto to get the correct scrollHeight
-      textareaRef.current.style.height = 'auto';
+
+  const handleSubmit = () => {
+    const trimmedMessage = message.trim();
+    if (trimmedMessage) {
+      onSendMessage(trimmedMessage);
+      setMessage('');
+      setIsTyping(false);
       
-      // Calculate the new height (with a max height)
-      const newHeight = Math.min(textareaRef.current.scrollHeight, 200); // Max height of 200px
-      
-      // Only update if the height has changed
-      if (newHeight !== height) {
-        setHeight(newHeight);
-        textareaRef.current.style.height = `${newHeight}px`;
-      }
-    }
-  }, [input, height]);
-  
-  // Handle key press events (e.g., Enter to send)
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!isLoading && input.trim()) {
-        sendMessage();
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
       }
     }
   };
-  
+
+  const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setMessage(value);
+    setIsTyping(value.length > 0);
+
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+    }
+  };
+
+  // Container styles with inline fallbacks
+  const containerStyles: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'flex-end',
+    gap: '0.75rem',
+    padding: '1rem',
+    borderTop: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
+    backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+    transition: 'all 0.3s ease',
+  };
+
+  // Input area styles
+  const inputAreaStyles: React.CSSProperties = {
+    flex: 1,
+    position: 'relative' as const,
+  };
+
+  const textareaStyles: React.CSSProperties = {
+    width: '100%',
+    minHeight: '44px',
+    maxHeight: '120px',
+    padding: '0.75rem 1rem',
+    border: `2px solid ${isDarkMode ? '#4b5563' : '#d1d5db'}`,
+    borderRadius: '1rem',
+    resize: 'none' as const,
+    fontSize: '1rem',
+    lineHeight: '1.5',
+    outline: 'none',
+    backgroundColor: isDarkMode ? '#374151' : '#ffffff',
+    color: isDarkMode ? '#ffffff' : '#1f2937',
+    transition: 'all 0.2s ease',
+    fontFamily: 'inherit',
+  };
+
+  const textareaFocusStyles: React.CSSProperties = {
+    borderColor: '#3b82f6',
+    boxShadow: isDarkMode 
+      ? '0 0 0 3px rgba(59, 130, 246, 0.2)' 
+      : '0 0 0 3px rgba(59, 130, 246, 0.1)',
+  };
+
+  // Send button styles
+  const sendButtonStyles: React.CSSProperties = {
+    minWidth: '44px',
+    height: '44px',
+    borderRadius: '50%',
+    border: 'none',
+    cursor: message.trim() ? 'pointer' : 'not-allowed',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.2rem',
+    transition: 'all 0.2s ease',
+    backgroundColor: message.trim() 
+      ? '#3b82f6' 
+      : (isDarkMode ? '#4b5563' : '#d1d5db'),
+    color: message.trim() 
+      ? '#ffffff' 
+      : (isDarkMode ? '#9ca3af' : '#6b7280'),
+    opacity: message.trim() ? 1 : 0.6,
+  };
+
+  const sendButtonHoverStyles: React.CSSProperties = {
+    backgroundColor: message.trim() ? '#2563eb' : sendButtonStyles.backgroundColor,
+    transform: message.trim() ? 'scale(1.05)' : 'none',
+  };
+
+  // Character count styles
+  const characterCountStyles: React.CSSProperties = {
+    position: 'absolute' as const,
+    bottom: '-1.5rem',
+    right: '0.5rem',
+    fontSize: '0.75rem',
+    color: isDarkMode ? '#9ca3af' : '#6b7280',
+    opacity: isTyping ? 1 : 0,
+    transition: 'opacity 0.2s ease',
+  };
+
+  // Typing indicator styles
+  const typingIndicatorStyles: React.CSSProperties = {
+    position: 'absolute' as const,
+    top: '-1.5rem',
+    left: '0.5rem',
+    fontSize: '0.75rem',
+    color: '#3b82f6',
+    opacity: isTyping ? 1 : 0,
+    transition: 'opacity 0.2s ease',
+  };
+
+  const placeholderText = isDarkMode 
+    ? "Type your message... (Press Enter to send, Shift+Enter for new line)"
+    : "Type your message... (Press Enter to send, Shift+Enter for new line)";
+
   return (
-    <div className="border-t dark:border-gray-800 p-3">
-      {/* Error message display */}
-      {error && (
-        <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded">
-          <p>{error}</p>
+    <div 
+      style={containerStyles}
+      className={`message-input-container ${isDarkMode ? 'dark-mode' : 'light-mode'}`}
+    >
+      <div style={inputAreaStyles}>
+        {/* Typing indicator */}
+        <div style={typingIndicatorStyles}>
+          ✏️ Typing...
         </div>
-      )}
-      
-      <div className="relative">
+
         <textarea
           ref={textareaRef}
-          className="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white resize-none transition-all"
-          placeholder="Type your message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          style={{ height: `${height}px` }}
-          rows={1}
-          disabled={isLoading}
+          value={message}
+          onChange={handleInputChange}
+          onKeyPress={handleKeyPress}
+          onFocus={(e) => {
+            Object.assign(e.target.style, {
+              ...textareaStyles,
+              ...textareaFocusStyles,
+            });
+          }}
+          onBlur={(e) => {
+            Object.assign(e.target.style, textareaStyles);
+          }}
+          style={textareaStyles}
+          placeholder={placeholderText}
+          className={`message-textarea ${isDarkMode ? 'dark' : 'light'}`}
+          aria-label="Type your message"
         />
-        
-        <button
-          className={`absolute right-3 bottom-3 rounded-full p-1.5 ${
-            isLoading || !input.trim()
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
-              : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700'
-          } transition-colors`}
-          onClick={sendMessage}
-          disabled={isLoading || !input.trim()}
-          aria-label="Send message"
-        >
-          {isLoading ? (
-            // Loading spinner
-            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          ) : (
-            // Send icon
-            <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          )}
-        </button>
+
+        {/* Character count */}
+        <div style={characterCountStyles}>
+          {message.length}/1000
+        </div>
       </div>
-      
-      {/* Optional hint for keyboard users */}
-      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
-        Press <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> to send, 
-        <kbd className="ml-1 px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Shift</kbd>+<kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">Enter</kbd> for new line
-      </div>
+
+      <button
+        onClick={handleSubmit}
+        disabled={!message.trim()}
+        style={sendButtonStyles}
+        onMouseEnter={(e) => {
+          if (message.trim()) {
+            Object.assign(e.currentTarget.style, {
+              ...sendButtonStyles,
+              ...sendButtonHoverStyles,
+            });
+          }
+        }}
+        onMouseLeave={(e) => {
+          Object.assign(e.currentTarget.style, sendButtonStyles);
+        }}
+        className={`send-button ${message.trim() ? 'enabled' : 'disabled'} ${isDarkMode ? 'dark' : 'light'}`}
+        aria-label="Send message"
+        title={message.trim() ? 'Send message (Enter)' : 'Type a message first'}
+      >
+        {message.trim() ? '🚀' : '📝'}
+      </button>
     </div>
   );
-}
+};
+
+export default MessageInput;

@@ -1,126 +1,363 @@
-@import 'tailwindcss';
+/* ==========================================
+   ENHANCED APP.CSS - COMPLETE THEME FIX
+   ========================================== */
 
-/* Apply dark mode transitions to html and body */
-html {
-  transition: background-color 0.3s ease, color 0.3s ease;
+/* ==========================================
+   ROOT VARIABLES & RESET
+   ========================================== */
+
+/* CSS Custom Properties for Theme Colors */
+:root {
+  /* Light theme colors */
+  --bg-primary-light: #ffffff;
+  --bg-secondary-light: #f8fafc;
+  --bg-tertiary-light: #f1f5f9;
+  --text-primary-light: #1f2937;
+  --text-secondary-light: #6b7280;
+  --border-light: #e5e7eb;
+  --accent-light: #3b82f6;
+  --shadow-light: rgba(0, 0, 0, 0.1);
+
+  /* Dark theme colors */
+  --bg-primary-dark: #1a1a1a;
+  --bg-secondary-dark: #111827;
+  --bg-tertiary-dark: #1f2937;
+  --text-primary-dark: #ffffff;
+  --text-secondary-dark: #d1d5db;
+  --border-dark: #374151;
+  --accent-dark: #3b82f6;
+  --shadow-dark: rgba(0, 0, 0, 0.3);
 }
 
-body {
+/* Global Reset - IMPORTANT: Remove body background conflicts */
+* {
   margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ==========================================
+   HTML & BODY - THEME FOUNDATION
+   ========================================== */
+
+/* Default (Light Mode) */
+html {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Removed conflicting @apply bg-white dark:bg-gray-900 dark:text-white; */
   transition: background-color 0.3s ease, color 0.3s ease;
+  
+  /* Light mode defaults */
+  background-color: var(--bg-primary-light) !important;
+  color: var(--text-primary-light) !important;
 }
 
-/* Custom scrollbar styles */
-::-webkit-scrollbar {
-  width: 8px;
+/* Dark Mode - Applied when .dark class is on <html> */
+html.dark {
+  background-color: var(--bg-primary-dark) !important;
+  color: var(--text-primary-dark) !important;
 }
 
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
+/* Body styles - REMOVED conflicting backgrounds */
+body {
+  font-family: inherit;
+  line-height: 1.6;
+  /* REMOVED: background and color properties to prevent conflicts */
+  /* Let the html element handle theme colors */
 }
 
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+/* ==========================================
+   APP CONTAINER
+   ========================================== */
+
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* Inherit colors from html element */
+  background-color: inherit;
+  color: inherit;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400 dark:bg-gray-600;
+/* ==========================================
+   CHATBOX COMPONENT STYLES
+   ========================================== */
+
+/* ChatBox Container */
+.chatbox-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 800px;
+  margin: 0 auto;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px var(--shadow-light);
 }
 
-/* Message animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+/* Light Theme Styles */
+.chatbox-container.light-theme {
+  background-color: var(--bg-primary-light) !important;
+  color: var(--text-primary-light) !important;
+  border: 1px solid var(--border-light);
+}
+
+/* Dark Theme Styles */
+.chatbox-container.dark-theme {
+  background-color: var(--bg-primary-dark) !important;
+  color: var(--text-primary-dark) !important;
+  border: 1px solid var(--border-dark);
+  box-shadow: 0 4px 6px var(--shadow-dark);
+}
+
+/* ==========================================
+   MESSAGE LIST STYLES
+   ========================================== */
+
+.message-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  transition: all 0.3s ease;
+}
+
+.message-list.light-mode {
+  background-color: var(--bg-secondary-light) !important;
+  color: var(--text-primary-light) !important;
+}
+
+.message-list.dark-mode {
+  background-color: var(--bg-secondary-dark) !important;
+  color: var(--text-primary-dark) !important;
+}
+
+/* Message Bubbles */
+.message-bubble {
+  word-wrap: break-word;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+/* User Messages */
+.message-bubble.user-message.light {
+  background-color: var(--accent-light) !important;
+  color: white !important;
+  border: 1px solid #2563eb !important;
+}
+
+.message-bubble.user-message.dark {
+  background-color: var(--accent-dark) !important;
+  color: white !important;
+  border: 1px solid #2563eb !important;
+}
+
+/* Assistant Messages */
+.message-bubble.assistant-message.light {
+  background-color: var(--bg-primary-light) !important;
+  color: var(--text-primary-light) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+.message-bubble.assistant-message.dark {
+  background-color: var(--bg-tertiary-dark) !important;
+  color: var(--text-primary-dark) !important;
+  border: 1px solid var(--border-dark) !important;
+}
+
+/* ==========================================
+   MESSAGE INPUT STYLES
+   ========================================== */
+
+.message-input-container {
+  border-top: 1px solid var(--border-light);
+  transition: all 0.3s ease;
+}
+
+.message-input-container.light-mode {
+  background-color: var(--bg-primary-light) !important;
+  border-top-color: var(--border-light) !important;
+}
+
+.message-input-container.dark-mode {
+  background-color: var(--bg-tertiary-dark) !important;
+  border-top-color: var(--border-dark) !important;
+}
+
+/* Textarea Styles */
+.message-textarea {
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.message-textarea.light {
+  background-color: var(--bg-primary-light) !important;
+  color: var(--text-primary-light) !important;
+  border-color: var(--border-light) !important;
+}
+
+.message-textarea.dark {
+  background-color: var(--bg-tertiary-dark) !important;
+  color: var(--text-primary-dark) !important;
+  border-color: var(--border-dark) !important;
+}
+
+.message-textarea:focus {
+  border-color: var(--accent-light) !important;
+  outline: none !important;
+}
+
+/* Send Button Styles */
+.send-button {
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.send-button.enabled {
+  background-color: var(--accent-light) !important;
+  color: white !important;
+}
+
+.send-button.disabled.light {
+  background-color: var(--border-light) !important;
+  color: var(--text-secondary-light) !important;
+}
+
+.send-button.disabled.dark {
+  background-color: var(--border-dark) !important;
+  color: var(--text-secondary-dark) !important;
+}
+
+/* ==========================================
+   SCROLLBAR STYLING
+   ========================================== */
+
+/* Light Mode Scrollbars */
+html:not(.dark) ::-webkit-scrollbar {
+  width: 6px;
+}
+
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: var(--bg-secondary-light);
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 3px;
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary-light);
+}
+
+/* Dark Mode Scrollbars */
+html.dark ::-webkit-scrollbar {
+  width: 6px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: var(--bg-secondary-dark);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: var(--border-dark);
+  border-radius: 3px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary-dark);
+}
+
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+
+/* Theme transition utilities */
+.theme-transition {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
+/* Focus utilities */
+.focus-visible:focus {
+  outline: 2px solid var(--accent-light) !important;
+  outline-offset: 2px;
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
+
+@media (max-width: 768px) {
+  .chatbox-container {
+    height: 100vh;
+    max-width: 100%;
+    border-radius: 0;
+    margin: 0;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .message-list {
+    padding: 0.5rem;
+  }
+  
+  .message-input-container {
+    padding: 0.75rem;
   }
 }
 
-@layer utilities {
-  .animate-fadeIn {
-    animation: fadeIn 0.3s ease-out forwards;
+@media (max-width: 480px) {
+  .message-bubble {
+    max-width: 85%;
+  }
+  
+  .message-input-container {
+    padding: 0.5rem;
   }
 }
 
-/* Dark mode transition for all components */
-.dark-mode-transition {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+/* ==========================================
+   ACCESSIBILITY IMPROVEMENTS
+   ========================================== */
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  html.dark {
+    --text-primary-dark: #ffffff;
+    --bg-primary-dark: #000000;
+    --border-dark: #666666;
+  }
+  
+  html:not(.dark) {
+    --text-primary-light: #000000;
+    --bg-primary-light: #ffffff;
+    --border-light: #333333;
+  }
 }
 
-/* Markdown Styling */
-.markdown-content {
-  @apply text-gray-800 dark:text-gray-200;
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
-.markdown-content h1 {
-  @apply text-xl font-bold my-4;
-}
+/* ==========================================
+   DEBUG UTILITIES (Remove in production)
+   ========================================== */
 
-.markdown-content h2 {
-  @apply text-lg font-bold my-3;
+/* Uncomment for debugging theme issues */
+/*
+.debug-theme::before {
+  content: attr(class);
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: red;
+  color: white;
+  padding: 5px;
+  font-size: 12px;
+  z-index: 9999;
 }
-
-.markdown-content h3 {
-  @apply text-base font-bold my-2;
-}
-
-.markdown-content h4, .markdown-content h5, .markdown-content h6 {
-  @apply font-bold my-2;
-}
-
-.markdown-content p {
-  @apply my-2;
-}
-
-.markdown-content ul {
-  @apply list-disc pl-6 my-2;
-}
-
-.markdown-content ol {
-  @apply list-decimal pl-6 my-2;
-}
-
-.markdown-content li {
-  @apply my-1;
-}
-
-.markdown-content blockquote {
-  @apply border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic my-3;
-}
-
-.markdown-content hr {
-  @apply my-4 border-gray-300 dark:border-gray-700;
-}
-
-.markdown-content img {
-  @apply max-w-full my-2 rounded;
-}
-
-.markdown-content pre {
-  @apply rounded overflow-auto p-3 my-3 bg-gray-800 dark:bg-gray-900 text-white dark:text-gray-200;
-}
-
-.markdown-content code {
-  @apply font-mono;
-}
-
-.markdown-content table {
-  @apply w-full border-collapse my-3;
-}
-
-.markdown-content th {
-  @apply border border-gray-300 dark:border-gray-700 px-4 py-2 bg-gray-100 dark:bg-gray-800;
-}
-
-.markdown-content td {
-  @apply border border-gray-300 dark:border-gray-700 px-4 py-2;
-}
+*/

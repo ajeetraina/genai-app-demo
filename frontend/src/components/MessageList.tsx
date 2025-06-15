@@ -1,107 +1,151 @@
-import React from 'react';
-import { Message } from '../types';
-import ReactMarkdown from 'react-markdown';
+import React, { useEffect, useRef } from 'react';
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'assistant';
+  timestamp: Date;
+}
 
 interface MessageListProps {
   messages: Message[];
-  showTokenCount?: boolean;
+  isDarkMode: boolean;
 }
 
-export function MessageList({ messages, showTokenCount = false }: MessageListProps) {
-  return (
-    <div className="flex flex-col space-y-4 p-4">
-      {messages.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-400 dark:text-gray-500">
-          <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-          </svg>
-          <p className="text-center text-sm mb-1">No messages yet</p>
-          <p className="text-xs text-center max-w-sm">Start a conversation by typing a message below. The model will respond in real-time.</p>
-        </div>
-      ) : (
-        messages.map((message) => (
-          <MessageItem
-            key={message.id}
-            message={message}
-            showTokenCount={showTokenCount}
-          />
-        ))
-      )}
-    </div>
-  );
-}
+const MessageList: React.FC<MessageListProps> = ({ messages, isDarkMode }) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-interface MessageItemProps {
-  message: Message;
-  showTokenCount: boolean;
-}
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-function MessageItem({ message, showTokenCount }: MessageItemProps) {
-  const isUser = message.role === 'user';
-  
-  // Format token counts for display
-  const getTokenCount = () => {
-    if (!showTokenCount) return null;
-    
-    const tokenCount = isUser 
-      ? message.metrics?.tokensIn 
-      : message.metrics?.tokensOut;
-      
-    if (tokenCount === undefined) return null;
-    
-    return (
-      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-        isUser 
-          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
-          : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-      }`}>
-        {tokenCount} tokens
-      </span>
-    );
+  // Container styles with inline fallbacks
+  const containerStyles: React.CSSProperties = {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '1rem',
+    backgroundColor: isDarkMode ? '#111827' : '#f8fafc',
+    color: isDarkMode ? '#ffffff' : '#1f2937',
+    transition: 'all 0.3s ease',
   };
-  
-  return (
-    <div className={`flex flex-col rounded-lg p-4 ${
-      isUser
-        ? 'bg-blue-50 dark:bg-blue-900/20 text-gray-800 dark:text-gray-200'
-        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'
-    }`}>
-      <div className="flex justify-between items-center mb-2">
-        <div className={`font-medium ${
-          isUser ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
-        }`}>
-          {isUser ? 'You' : 'Assistant'}
+
+  // Message bubble styles
+  const getMessageStyles = (sender: 'user' | 'assistant'): React.CSSProperties => {
+    const isUser = sender === 'user';
+    
+    return {
+      marginBottom: '1rem',
+      display: 'flex',
+      justifyContent: isUser ? 'flex-end' : 'flex-start',
+    };
+  };
+
+  const getBubbleStyles = (sender: 'user' | 'assistant'): React.CSSProperties => {
+    const isUser = sender === 'user';
+    
+    // Force theme colors with inline styles
+    let backgroundColor: string;
+    let color: string;
+    let borderColor: string;
+
+    if (isDarkMode) {
+      backgroundColor = isUser ? '#3b82f6' : '#374151';
+      color = '#ffffff';
+      borderColor = isUser ? '#2563eb' : '#4b5563';
+    } else {
+      backgroundColor = isUser ? '#3b82f6' : '#ffffff';
+      color = isUser ? '#ffffff' : '#1f2937';
+      borderColor = isUser ? '#2563eb' : '#e5e7eb';
+    }
+
+    return {
+      maxWidth: '70%',
+      padding: '0.75rem 1rem',
+      borderRadius: isUser ? '1rem 1rem 0.25rem 1rem' : '1rem 1rem 1rem 0.25rem',
+      backgroundColor,
+      color,
+      border: `1px solid ${borderColor}`,
+      boxShadow: isDarkMode 
+        ? '0 2px 4px rgba(0, 0, 0, 0.3)' 
+        : '0 2px 4px rgba(0, 0, 0, 0.1)',
+      wordWrap: 'break-word',
+      transition: 'all 0.3s ease',
+    };
+  };
+
+  const getTimestampStyles = (): React.CSSProperties => ({
+    fontSize: '0.75rem',
+    color: isDarkMode ? '#9ca3af' : '#6b7280',
+    marginTop: '0.25rem',
+    textAlign: 'center' as const,
+  });
+
+  const getSenderLabelStyles = (sender: 'user' | 'assistant'): React.CSSProperties => ({
+    fontSize: '0.75rem',
+    fontWeight: 'bold',
+    color: isDarkMode ? '#d1d5db' : '#4b5563',
+    marginBottom: '0.25rem',
+    textAlign: sender === 'user' ? 'right' : 'left' as const,
+  });
+
+  // Empty state styles
+  const emptyStateStyles: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: isDarkMode ? '#9ca3af' : '#6b7280',
+    fontSize: '1.1rem',
+  };
+
+  const emptyIconStyles: React.CSSProperties = {
+    fontSize: '3rem',
+    marginBottom: '1rem',
+    opacity: 0.5,
+  };
+
+  if (messages.length === 0) {
+    return (
+      <div style={containerStyles}>
+        <div style={emptyStateStyles}>
+          <div style={emptyIconStyles}>💬</div>
+          <p>No messages yet. Start a conversation!</p>
         </div>
-        {getTokenCount()}
       </div>
-      
-      <div className="message-content">
-        {isUser ? (
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-        ) : (
-          <ReactMarkdown
-            className="prose prose-sm dark:prose-invert max-w-none markdown-content"
-            components={{
-              pre: ({ node, ...props }) => (
-                <div className="relative mt-2 mb-4">
-                  <pre
-                    className="bg-gray-100 dark:bg-gray-950 p-4 rounded-lg overflow-x-auto text-sm"
-                    {...props}
-                  />
-                </div>
-              ),
-              code: ({ node, inline, ...props }) =>
-                inline ? (
-                  <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props} />
-                ) : (
-                  <code {...props} />
-                ),
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-        )}
-      </div>
+    );
+  }
+
+  return (
+    <div 
+      style={containerStyles}
+      className={`message-list ${isDarkMode ? 'dark-mode' : 'light-mode'}`}
+    >
+      {messages.map((message) => (
+        <div key={message.id} style={getMessageStyles(message.sender)}>
+          <div>
+            <div style={getSenderLabelStyles(message.sender)}>
+              {message.sender === 'user' ? 'You' : 'Assistant'}
+            </div>
+            <div 
+              style={getBubbleStyles(message.sender)}
+              className={`message-bubble ${message.sender}-message ${isDarkMode ? 'dark' : 'light'}`}
+            >
+              {message.text}
+            </div>
+            <div style={getTimestampStyles()}>
+              {message.timestamp.toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+      <div ref={messagesEndRef} />
     </div>
   );
-}
+};
+
+export default MessageList;

@@ -1,312 +1,136 @@
-import { useState, useEffect } from 'react';
-import { Message, MessageMetrics, ModelMetadata } from '../types';
-import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
-import { SimplifiedMetrics } from './SimplifiedMetrics';
-import { ModelInfoCard } from './ModelInfoCard';
+import React, { useState, useEffect } from 'react';
+import MessageList from './MessageList';
+import MessageInput from './MessageInput';
 
-export default function ChatBox() {
-  const [input, setInput] = useState('');
-  const [isLoading, setLoading] = useState(false);
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'assistant';
+  timestamp: Date;
+}
+
+const ChatBox: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [showMetrics, setShowMetrics] = useState(true); // Default to true to show metrics
-  const [showModelInfo, setShowModelInfo] = useState(false); // Toggle for model info panel
-  const [messageMetrics, setMessageMetrics] = useState<Record<string, MessageMetrics>>({});
-  const [modelInfo, setModelInfo] = useState<ModelMetadata | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
-  // Load messages from local storage on initial render
+  // Initialize theme from localStorage or system preference
   useEffect(() => {
-    const savedMessages = localStorage.getItem('chatMessages');
-    if (savedMessages) {
-      try {
-        setMessages(JSON.parse(savedMessages));
-      } catch (e) {
-        console.error('Failed to parse saved messages:', e);
-      }
-    }
-
-    // Fetch model information
-    fetchModelInfo();
+    const savedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    const shouldUseDark = savedTheme === 'dark' || (!savedTheme && systemPrefersDark);
+    setIsDarkMode(shouldUseDark);
+    
+    // Apply theme to HTML element
+    document.documentElement.classList.toggle('dark', shouldUseDark);
+    
+    console.log(`🎨 Initial theme: ${shouldUseDark ? 'DARK' : 'LIGHT'}`);
   }, []);
 
-  // Save messages to local storage when they change
-  useEffect(() => {
-    localStorage.setItem('chatMessages', JSON.stringify(messages));
-  }, [messages]);
-
-  const fetchModelInfo = async () => {
-    try {
-      const response = await fetch('http://localhost:8080/health');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.model_info) {
-          setModelInfo(data.model_info);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to fetch model info:', e);
-    }
+  // Handle theme toggle
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    console.log(`🔄 Theme toggle clicked - switching from ${isDarkMode ? 'DARK' : 'LIGHT'} to ${newTheme ? 'DARK' : 'LIGHT'}`);
+    
+    setIsDarkMode(newTheme);
+    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+    
+    // Apply theme to HTML element
+    document.documentElement.classList.toggle('dark', newTheme);
+    
+    // Debug logging
+    setTimeout(() => {
+      const hasClass = document.documentElement.classList.contains('dark');
+      console.log(`${newTheme ? '🌙' : '☀️'} ${newTheme ? 'Dark' : 'Light'} mode activated`);
+      console.log(`✅ Dark class ${hasClass ? 'IS' : 'IS NOT'} present on HTML element`);
+    }, 100);
   };
 
-  const handleSendMessage = async () => {
-    if (!input.trim()) return;
-    setLoading(true);
-    const currentInput = input;
-    setInput('');
-    setError(null);
-
-    try {
-      // Record message metrics
-      const messageId = Date.now().toString();
-      const requestStartTime = performance.now();
-      const tokensIn = estimateTokenCount(currentInput);
-      
-      console.log('Input tokens calculated:', tokensIn); // Debug log
-      
-      const metric: MessageMetrics = {
-        requestTime: requestStartTime,
-        responseTime: 0,
-        tokensIn: tokensIn,
-        tokensOut: 0,
-        firstTokenTime: 0
-      };
-      setMessageMetrics(prev => ({ ...prev, [messageId]: metric }));
-
-      // Add user message to the chat with token count
-      const userMessage: Message = {
-        id: messageId,
-        role: 'user',
-        content: currentInput,
-        metrics: {
-          tokensIn: tokensIn
-        }
-      };
-      
-      setMessages(prev => [...prev, userMessage]);
-      console.log('User message with metrics:', userMessage); // Debug log
-
-      // Send message to the backend
-      const response = await fetch('http://localhost:8080/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: currentInput, messages: messages }),
-      });
-
-      if (response.status !== 200) {
-        setError(`Error: ${response.statusText || 'Failed to get response'}`);
-        logError('api_error', response.status, currentInput.length);
-        return;
-      }
-
-      await handleStreamResponse(response, messageId, requestStartTime);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setError('Network error. Please check your connection and try again.');
-      logError('network_error', 0, currentInput.length);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStreamResponse = async (response: Response, messageId: string, requestStartTime: number) => {
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let done = false;
-    let hasReceivedFirstToken = false;
-
-    const aiMessageId = Date.now().toString();
-    const aiMessage: Message = {
-      id: aiMessageId,
-      role: 'assistant',
-      content: '',
-      metrics: {
-        tokensOut: 0
-      }
+  const handleSendMessage = (text: string) => {
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text,
+      sender: 'user',
+      timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, aiMessage]);
+    setMessages(prev => [...prev, newMessage]);
 
-    let tokenCount = 0;
-    while (!done && reader) {
-      const { value, done: doneReading } = await reader.read();
-      done = doneReading;
-      const chunk = decoder.decode(value, { stream: true });
-      
-      tokenCount += chunk.length > 0 ? 1 : 0; // Approximate token count
-      
-      // Record time to first token
-      if (!hasReceivedFirstToken && chunk.length > 0) {
-        hasReceivedFirstToken = true;
-        const firstTokenTime = performance.now();
-        setMessageMetrics(prev => {
-          const metric = prev[messageId];
-          if (metric) {
-            return {
-              ...prev,
-              [messageId]: {
-                ...metric,
-                firstTokenTime: firstTokenTime - requestStartTime
-              }
-            };
-          }
-          return prev;
-        });
-      }
-
-      // Update message content and token count
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId
-            ? { 
-                ...msg, 
-                content: msg.content + chunk,
-                metrics: {
-                  ...msg.metrics,
-                  tokensOut: tokenCount
-                }
-              }
-            : msg,
-        ),
-      );
-    }
-
-    // Record final metrics after response is complete
-    const responseEndTime = performance.now();
-    setMessageMetrics(prev => {
-      const metric = prev[messageId];
-      if (metric) {
-        return {
-          ...prev,
-          [messageId]: {
-            ...metric,
-            responseTime: responseEndTime - requestStartTime,
-            tokensOut: tokenCount
-          }
-        };
-      }
-      return prev;
-    });
-
-    // Log metrics to the backend
-    logMetrics(messageId, tokenCount, responseEndTime - requestStartTime);
+    // Simulate assistant response
+    setTimeout(() => {
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: `I received your message: "${text}"`,
+        sender: 'assistant',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+    }, 1000);
   };
 
-  const estimateTokenCount = (text: string): number => {
-    // Very rough token estimation (4 chars per token on average)
-    const count = Math.ceil(text.length / 4);
-    return count > 0 ? count : 1; // Ensure at least 1 token for any non-empty text
+  // Dynamic styles with inline fallbacks
+  const chatBoxStyles: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100vh',
+    maxWidth: '800px',
+    margin: '0 auto',
+    backgroundColor: isDarkMode ? '#1a1a1a' : '#ffffff',
+    color: isDarkMode ? '#ffffff' : '#000000',
+    transition: 'all 0.3s ease',
   };
 
-  const logMetrics = async (messageId: string, tokenCount: number, responseTime: number) => {
-    try {
-      const metric = messageMetrics[messageId];
-      if (!metric) return;
-      
-      // Send metrics to backend
-      await fetch('http://localhost:8080/metrics/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message_id: messageId,
-          tokens_in: metric.tokensIn,
-          tokens_out: tokenCount,
-          response_time_ms: responseTime,
-          time_to_first_token_ms: metric.firstTokenTime || 0
-        }),
-      });
-    } catch (e) {
-      console.error('Failed to log metrics:', e);
-    }
+  const headerStyles: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '1rem',
+    borderBottom: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
+    backgroundColor: isDarkMode ? '#111827' : '#f9fafb',
   };
 
-  const logError = async (errorType: string, statusCode: number, inputLength: number) => {
-    try {
-      await fetch('http://localhost:8080/metrics/error', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          error_type: errorType,
-          status_code: statusCode,
-          input_length: inputLength,
-          timestamp: new Date().toISOString()
-        }),
-      });
-    } catch (e) {
-      console.error('Failed to log error:', e);
-    }
-  };
-
-  const clearConversation = () => {
-    setMessages([]);
-    setMessageMetrics({});
-    localStorage.removeItem('chatMessages');
-  };
-
-  const toggleMetrics = () => {
-    setShowMetrics(!showMetrics);
-  };
-
-  const toggleModelInfo = () => {
-    setShowModelInfo(!showModelInfo);
+  const themeButtonStyles: React.CSSProperties = {
+    background: 'none',
+    border: `2px solid ${isDarkMode ? '#6b7280' : '#d1d5db'}`,
+    borderRadius: '8px',
+    padding: '0.5rem 1rem',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    color: isDarkMode ? '#ffffff' : '#000000',
+    backgroundColor: isDarkMode ? '#374151' : '#ffffff',
+    transition: 'all 0.2s ease',
   };
 
   return (
-    <div className="flex flex-col w-full max-w-3xl mx-auto h-[calc(100vh-180px)] rounded-lg shadow-lg border dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden transition-colors duration-200">
-      <div className="flex items-center justify-between p-3 border-b dark:border-gray-800">
-        <div className="flex items-center space-x-2">
-          {modelInfo ? (
-            <div className="flex items-center cursor-pointer" onClick={toggleModelInfo}>
-              <ModelInfoCard modelInfo={modelInfo} isMinimized={true} />
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showModelInfo ? "M19 9l-7 7-7-7" : "M9 5l7 7-7 7"} />
-              </svg>
-            </div>
-          ) : (
-            <h2 className="text-lg font-semibold">Chat</h2>
-          )}
-        </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={toggleMetrics}
-            className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            aria-label={showMetrics ? 'Hide Metrics' : 'Show Metrics'}
-          >
-            {showMetrics ? 'Hide Metrics' : 'Show Metrics'}
-          </button>
-          {messages.length > 0 && (
-            <button
-              onClick={clearConversation}
-              className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 transition-colors duration-200 px-2 py-1"
-              aria-label="Clear conversation"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
-      
-      {/* Show model info card when expanded */}
-      {showModelInfo && modelInfo && (
-        <div className="px-3 pt-2">
-          <ModelInfoCard modelInfo={modelInfo} />
-        </div>
-      )}
-      
-      {/* Use the simplified metrics component with collapsed/expandable functionality */}
-      {showMetrics && <SimplifiedMetrics isVisible={showMetrics} messages={messages} />}
-      
-      {/* Add max-height and overflow to make message list scrollable but not take up entire screen */}
-      <div className="flex-1 overflow-y-auto">
-        <MessageList messages={messages} showTokenCount={true} />
-      </div>
-      
-      <MessageInput
-        input={input}
-        setInput={setInput}
-        sendMessage={handleSendMessage}
-        isLoading={isLoading}
-        error={error}
-      />
+    <div 
+      className={`chatbox-container ${isDarkMode ? 'dark-theme' : 'light-theme'}`}
+      style={chatBoxStyles}
+    >
+      {/* Header with Theme Toggle */}
+      <header style={headerStyles}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
+          Chat Application
+        </h1>
+        <button
+          onClick={toggleTheme}
+          style={themeButtonStyles}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? '#4b5563' : '#f3f4f6';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#ffffff';
+          }}
+        >
+          {isDarkMode ? '☀️ Light' : '🌙 Dark'}
+        </button>
+      </header>
+
+      {/* Messages Area */}
+      <MessageList messages={messages} isDarkMode={isDarkMode} />
+
+      {/* Input Area */}
+      <MessageInput onSendMessage={handleSendMessage} isDarkMode={isDarkMode} />
     </div>
   );
-}
+};
+
+export default ChatBox;
