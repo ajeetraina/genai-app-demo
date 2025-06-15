@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  model-runner:
+    image: ai/llama3.2:1B-Q8_0
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'bash',
+          '-c',
+          "{ printf >&3 'GET / HTTP/1.0\\r\\n\\r\\n'; cat <&3; } 3<>/dev/tcp/localhost/11434 | grep 'Docker Model Runner is' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test-network
+
+  backend:
+    build:
+      context: ..
+      target: backend
+    environment:
+      - BASE_URL=http://model-runner.docker.internal/engines/llama.cpp/v1/
+      - MODEL=ai/llama3.2:1B-Q8_0
+      - API_KEY=dockermodelrunner
+    ports:
+      - "8080:8080"
+    depends_on:
+      model-runner:
+        condition: service_healthy
+    networks:
+      - test-network
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/health']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://backend:8080
+      - VITE_API_URL=http://backend:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
