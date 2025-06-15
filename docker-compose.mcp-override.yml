@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mcp-metrics-server:
+    build:
+      context: ./mcp-metrics-server
+      dockerfile: Dockerfile
+    container_name: genai-mcp-metrics
+    environment:
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_URL=http://grafana:3001
+      - MODEL_RUNNER_URL=http://model-runner:12434
+      - JAEGER_URL=http://jaeger:16686
+      - MCP_PORT=8811
+    ports:
+      - "8811:8811"
+    depends_on:
+      - prometheus
+      - grafana
+    networks:
+      - default
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8811 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Add a dedicated stdio bridge if needed
+  mcp-bridge:
+    build:
+      context: ./mcp-stdio-bridge
+      dockerfile: Dockerfile
+    environment:
+      - TARGET_HOST=mcp-metrics-server
+      - TARGET_PORT=8811
+    depends_on:
+      - mcp-metrics-server
+    restart: unless-stopped

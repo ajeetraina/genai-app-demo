@@ -271,3 +271,30 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## 🤖 MCP Integration
+
+This project now includes Model Context Protocol (MCP) integration, enabling AI-powered monitoring through Claude Desktop.
+
+### Features
+- Real-time performance analysis through Claude
+- AI-powered health recommendations
+- Custom Prometheus query execution
+- Intelligent resource optimization suggestions
+
+### Quick Setup
+```bash
+# Build and start MCP integration
+./start-mcp-stack.sh
+
+# Configure Claude Desktop with the provided config
+# Start asking Claude about your model performance!
+```
+
+For detailed MCP documentation, see [docs/mcp/README.md](docs/mcp/README.md).
+
+### Example Claude Interactions
+- "How is my model performing right now?"
+- "Analyze GPU utilization and suggest optimizations"
+- "Show me error patterns from the last hour"
+- "What's the 95th percentile latency trend?"
